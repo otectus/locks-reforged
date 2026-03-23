@@ -1,6 +1,6 @@
 # Locks Reforged Changelog
 
-## 1.2.2
+## 1.2.4
 
 ### Bug Fixes
 - Fixed pervasive null-pointer crashes caused by unsafe `.orElse(null)` capability chains across 12 files — affects lock placement, lock picking, key ring usage, chunk loading, packet handling, and client rendering.
