@@ -1,0 +1,24 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"pattern":
+	[
+		"NN",
+		"NN",
+		"I "
+	],
+	"key":
+	{
+		"N":
+		{
+			"tag": "forge:nuggets/iron"
+		},
+		"I":
+		{
+			"tag": "forge:ingots/iron"
+		}
+	},
+	"result":
+	{
+		"item": "locks:key_blank"
+	}
+}

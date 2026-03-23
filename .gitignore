@@ -1,0 +1,26 @@
+# Gradle
+build/
+.gradle/
+
+# Runtime
+run/
+logs/
+
+# IDE
+.idea/
+*.iml
+.settings/
+.classpath
+.project
+.vscode/
+*.launch
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Reference material (original mod sources)
+/source-1.16.5/
+/original/
+/melonslise/
+/packs/

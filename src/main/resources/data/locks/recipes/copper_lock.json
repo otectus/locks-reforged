@@ -1,0 +1,9 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"pattern": [" I ", "ILI", "III"],
+	"key": {
+		"I": {"tag": "forge:ingots/copper"},
+		"L": {"item": "locks:copper_lock_mechanism"}
+	},
+	"result": {"item": "locks:copper_lock"}
+}

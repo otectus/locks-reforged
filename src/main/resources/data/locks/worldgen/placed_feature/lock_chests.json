@@ -1,0 +1,8 @@
+{
+	"feature": "locks:lock_chests",
+	"placement": [
+		{
+			"type": "locks:chest"
+		}
+	]
+}
