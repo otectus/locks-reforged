@@ -5,9 +5,9 @@ import melonslise.locks.common.init.LocksEnchantments;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.entity.EquipmentSlot;
 
-public class ComplexityEnchantment extends Enchantment
+public class AutoPickEnchantment extends Enchantment
 {
-	public ComplexityEnchantment()
+	public AutoPickEnchantment()
 	{
 		super(Rarity.VERY_RARE, LocksEnchantments.LOCK_TYPE, new EquipmentSlot[] { EquipmentSlot.MAINHAND });
 	}
@@ -15,13 +15,13 @@ public class ComplexityEnchantment extends Enchantment
 	@Override
 	public int getMinCost(int level)
 	{
-		return 7 + level * 10;
+		return 15 + (level - 1) * 12;
 	}
 
 	@Override
 	public int getMaxCost(int level)
 	{
-		return this.getMinCost(level) + 15;
+		return this.getMinCost(level) + 20;
 	}
 
 	@Override
@@ -31,11 +31,17 @@ public class ComplexityEnchantment extends Enchantment
 	}
 
 	@Override
-	public boolean isDiscoverable() { return LocksServerConfig.ENABLE_COMPLEXITY.get(); }
+	protected boolean checkCompatibility(Enchantment other)
+	{
+		return super.checkCompatibility(other) && other != LocksEnchantments.COMPLEXITY.get();
+	}
 
 	@Override
-	public boolean isTradeable() { return LocksServerConfig.ENABLE_COMPLEXITY.get(); }
+	public boolean isDiscoverable() { return LocksServerConfig.ENABLE_AUTO_PICK.get(); }
 
 	@Override
-	public boolean isAllowedOnBooks() { return LocksServerConfig.ENABLE_COMPLEXITY.get(); }
+	public boolean isTradeable() { return LocksServerConfig.ENABLE_AUTO_PICK.get(); }
+
+	@Override
+	public boolean isAllowedOnBooks() { return LocksServerConfig.ENABLE_AUTO_PICK.get(); }
 }

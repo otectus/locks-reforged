@@ -152,6 +152,9 @@ public class LockPickingScreen extends AbstractContainerScreen<LockPickingContai
 
 		PoseStack mtx = guiGraphics.pose();
 
+		// Flush pending GuiGraphics buffers before raw Tesselator rendering
+		guiGraphics.flush();
+
 		RenderSystem.setShaderTexture(0, this.lockTex);
 
 		mtx.pushPose();
@@ -167,7 +170,6 @@ public class LockPickingScreen extends AbstractContainerScreen<LockPickingContai
 		}
 		BACK_WALL_TEX.draw(mtx, this.length * (COLUMN_TEX.width + INNER_WALL_TEX.width), 0f, 1f);
 		HANDLE_TEX.draw(mtx, BACK_WALL_TEX.width + this.length * (COLUMN_TEX.width + INNER_WALL_TEX.width), 2f, 1f);
-		// FIXME right way??
 		RenderSystem.enableBlend();
 		RenderSystem.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
 		for(Sprite sprite : this.sprites)
@@ -177,6 +179,10 @@ public class LockPickingScreen extends AbstractContainerScreen<LockPickingContai
 			sprite.draw(mtx, pt);
 		}
 		mtx.popPose();
+
+		// Restore GL state to prevent blend leakage into other rendering
+		RenderSystem.defaultBlendFunc();
+		RenderSystem.disableBlend();
 	}
 
 	@Override

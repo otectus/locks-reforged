@@ -3,6 +3,7 @@ package melonslise.locks.common.item;
 import java.util.List;
 
 import melonslise.locks.Locks;
+import melonslise.locks.common.config.LocksServerConfig;
 import melonslise.locks.common.init.LocksEnchantments;
 import melonslise.locks.common.init.LockTypeRegistry;
 import melonslise.locks.common.util.Lockable;
@@ -44,7 +45,8 @@ public class LockPickItem extends Item
 
 	public static boolean canPick(ItemStack stack, Lockable lkb)
 	{
-		return canPick(stack, EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.COMPLEXITY.get(), lkb.stack));
+		return canPick(stack, LocksServerConfig.ENABLE_COMPLEXITY.get()
+			? EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.COMPLEXITY.get(), lkb.stack) : 0);
 	}
 
 	@OnlyIn(Dist.CLIENT)

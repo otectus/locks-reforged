@@ -5,9 +5,9 @@ import melonslise.locks.common.init.LocksEnchantments;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.entity.EquipmentSlot;
 
-public class SturdyEnchantment extends Enchantment
+public class ReinforcedEnchantment extends Enchantment
 {
-	public SturdyEnchantment()
+	public ReinforcedEnchantment()
 	{
 		super(Rarity.RARE, LocksEnchantments.LOCK_TYPE, new EquipmentSlot[] { EquipmentSlot.MAINHAND });
 	}
@@ -15,7 +15,7 @@ public class SturdyEnchantment extends Enchantment
 	@Override
 	public int getMinCost(int level)
 	{
-		return 5 + (level - 1) * 15;
+		return 5 + (level - 1) * 10;
 	}
 
 	@Override
@@ -31,11 +31,11 @@ public class SturdyEnchantment extends Enchantment
 	}
 
 	@Override
-	public boolean isDiscoverable() { return LocksServerConfig.ENABLE_STURDY.get(); }
+	public boolean isDiscoverable() { return LocksServerConfig.ENABLE_REINFORCED.get(); }
 
 	@Override
-	public boolean isTradeable() { return LocksServerConfig.ENABLE_STURDY.get(); }
+	public boolean isTradeable() { return LocksServerConfig.ENABLE_REINFORCED.get(); }
 
 	@Override
-	public boolean isAllowedOnBooks() { return LocksServerConfig.ENABLE_STURDY.get(); }
+	public boolean isAllowedOnBooks() { return LocksServerConfig.ENABLE_REINFORCED.get(); }
 }

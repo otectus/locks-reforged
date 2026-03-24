@@ -5,6 +5,7 @@ import java.util.function.Consumer;
 import melonslise.locks.Locks;
 import melonslise.locks.client.gui.LockPickingScreen;
 import melonslise.locks.common.capability.ILockableHandler;
+import melonslise.locks.common.config.LocksServerConfig;
 import melonslise.locks.common.init.LocksCapabilities;
 import melonslise.locks.common.init.LocksMenuTypes;
 import melonslise.locks.common.init.LocksDamageSources;
@@ -77,9 +78,9 @@ public class LockPickingContainer extends AbstractContainerMenu
 		Lockable.State state = lkb.getLockState(player.level());
 		this.pos = state == null ? lkb.bb.center() : state.pos;
 
-		this.shocking = EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.SHOCKING.get(), this.lockable.stack);
-		this.sturdy = EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.STURDY.get(), this.lockable.stack);
-		this.complexity = EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.COMPLEXITY.get(), this.lockable.stack);
+		this.shocking = LocksServerConfig.ENABLE_SHOCKING.get() ? EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.SHOCKING.get(), this.lockable.stack) : 0;
+		this.sturdy = LocksServerConfig.ENABLE_STURDY.get() ? EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.STURDY.get(), this.lockable.stack) : 0;
+		this.complexity = LocksServerConfig.ENABLE_COMPLEXITY.get() ? EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.COMPLEXITY.get(), this.lockable.stack) : 0;
 
 		// Syncs the player inventory
 

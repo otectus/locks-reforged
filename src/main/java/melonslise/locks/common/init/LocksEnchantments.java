@@ -1,8 +1,11 @@
 package melonslise.locks.common.init;
 
 import melonslise.locks.Locks;
+import melonslise.locks.common.enchantment.AutoPickEnchantment;
 import melonslise.locks.common.enchantment.ComplexityEnchantment;
+import melonslise.locks.common.enchantment.ReinforcedEnchantment;
 import melonslise.locks.common.enchantment.ShockingEnchantment;
+import melonslise.locks.common.enchantment.SilentEnchantment;
 import melonslise.locks.common.enchantment.SturdyEnchantment;
 import melonslise.locks.common.item.LockItem;
 import net.minecraft.world.item.enchantment.Enchantment;
@@ -21,7 +24,10 @@ public final class LocksEnchantments
 	public static final RegistryObject<Enchantment>
 		SHOCKING = ENCHANTMENTS.register("shocking", ShockingEnchantment::new),
 		STURDY = ENCHANTMENTS.register("sturdy", SturdyEnchantment::new),
-		COMPLEXITY = ENCHANTMENTS.register("complexity", ComplexityEnchantment::new);
+		COMPLEXITY = ENCHANTMENTS.register("complexity", ComplexityEnchantment::new),
+		SILENT = ENCHANTMENTS.register("silent", SilentEnchantment::new),
+		AUTO_PICK = ENCHANTMENTS.register("auto_pick", AutoPickEnchantment::new),
+		REINFORCED = ENCHANTMENTS.register("reinforced", ReinforcedEnchantment::new);
 
 	private LocksEnchantments() {}
 

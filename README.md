@@ -35,7 +35,7 @@ All lock and lock pick types are defined via JSON files, making it easy to add c
 |----------|-------|
 | **Locks** | Wood Lock, Iron Lock, Steel Lock, Gold Lock, Diamond Lock (+ custom) |
 | **Keys** | Key Blank, Key, Master Key, Key Ring |
-| **Lock Picks** | Wood, Iron, Steel, Gold, Diamond (+ custom) |
+| **Lock Picks** | Wood, Bobby Pin (copper), Iron, Steel, Gold, Diamond (+ custom) |
 | **Components** | Spring, Wood/Iron/Steel Lock Mechanisms |
 
 ### Lock Picking Minigame
@@ -43,14 +43,19 @@ An interactive lock picking mechanic with a pin-matching system. Each lock has a
 
 ### Enchantments
 
-| Enchantment | Effect |
-|-------------|--------|
-| **Shocking** | Electrocutes players who fail to pick the lock (bypasses armor) |
-| **Sturdy** | Reduces lock pick effectiveness against the lock |
-| **Complexity** | Makes the lock impossible to pick with lower-tier lock picks |
+| Enchantment | Max Level | Effect |
+|-------------|-----------|--------|
+| **Shocking** | V | Electrocutes players who fail to pick the lock (bypasses armor) |
+| **Sturdy** | III | Reduces lock pick effectiveness against the lock |
+| **Complexity** | III | Makes the lock impossible to pick with lower-tier lock picks |
+| **Silent** | I | Suppresses the rattle sound when access is denied. Incompatible with Shocking |
+| **Auto-Pick** | III | 10%/20%/30% chance to instantly open the lock, bypassing the minigame. Incompatible with Complexity |
+| **Reinforced** | III | Increases explosion resistance by 50%/100%/150%. Protects against TNT and creepers |
+
+Each enchantment can be individually enabled or disabled in the server config.
 
 ### World Generation
-Locked chests spawn naturally in the overworld. Lock type distribution and spawn rates are fully configurable.
+Locked chests spawn naturally in structures. By default, lock tier is determined by **loot value** — chests with better loot get stronger locks. The system samples each loot table multiple times and averages the results for consistent tier assignments, uses sub-linear stack count scaling so bulk common items don't inflate value, and supports per-item value overrides for materials like diamonds and netherite that are valuable but have common rarity. Can be switched to random weighted selection in the common config.
 
 ### Villager & Wandering Trader Integration
 Toolsmith villagers sell lock picks and lock mechanisms at various profession levels. Wandering traders offer rare lock picks and enchanted locks.
@@ -146,10 +151,11 @@ Only fields present in the override are changed; omitted fields keep their defau
 ## Configuration
 
 ### Common Config (`locks-common.toml`)
-- **Generation Chance** -- Probability of locks spawning on generated chests (default: 85%)
+- **Generation Chance** -- Probability of locks spawning on generated chests (default: 85%, only used when loot-scaled locks is disabled)
 - **Enchant Chance** -- Probability of generated locks being enchanted (default: 40%)
 - **Lock Types & Weights** -- Which locks generate and their relative rarity
 - **Randomize Loaded Locks** -- Whether to randomize lock combinations on chunk load
+- **Loot-Scaled Locks** -- When enabled (default), lock tier is chosen based on chest loot value instead of random selection. Configurable item value formula with rarity multipliers, enchantment bonuses, per-tier value thresholds, multi-sample averaging (default: 32 samples), sub-linear stack count scaling, and per-item value overrides.
 
 ### Client Config (`locks-client.toml`)
 - **Deaf Mode** -- Enables visual feedback for the lock picking mechanic
@@ -159,6 +165,7 @@ Only fields present in the override are changed; omitted fields keep their defau
 - **Protect Lockables** -- Whether locked blocks are protected from being broken
 - **Hide Lock ID** -- Hides the lock ID line from both inventory and HUD tooltips (default: false)
 - **Hide HUD Enchantments** -- Hides enchantment lines from the HUD floating tooltip only; inventory tooltips are unaffected (default: false)
+- **Enchantment Toggles** -- Each of the 6 enchantments (Shocking, Sturdy, Complexity, Silent, Auto-Pick, Reinforced) can be individually enabled or disabled
 
 ## Building from Source
 

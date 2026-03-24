@@ -44,7 +44,7 @@
 
 ### Still Needs Testing
 - [ ] Lock persistence across chunk unload/reload
-- [ ] Multiplayer sync when players enter lock areas
+- [ ] Multiplayer sync when players enter lock areas (ChunkMapMixin packet fix applied in 1.3.0)
 - [ ] Structure template save/load with locks
 - [ ] Modded block compatibility (blocks without BlockEntities)
 - [ ] Loot table injection (verify lock picks/mechanisms appear in dungeon chests)
@@ -52,4 +52,9 @@
 - [ ] World generation (verify locked chests spawn in overworld)
 - [ ] Lock picking minigame UI
 - [ ] Key ring container UI
-- [ ] Enchantment application on locks
+- [ ] Enchantment application on locks (now 6 total: Shocking, Sturdy, Complexity, Silent, Auto-Pick, Reinforced)
+- [ ] Silent enchantment suppresses rattle sound
+- [ ] Auto-Pick enchantment bypasses minigame at correct rates (10%/20%/30%)
+- [ ] Reinforced enchantment scales explosion resistance
+- [ ] Silent/Shocking incompatibility enforced by enchanting table
+- [ ] Auto-Pick/Complexity incompatibility enforced by enchanting table

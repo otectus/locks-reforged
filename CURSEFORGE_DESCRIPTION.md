@@ -32,15 +32,20 @@ All locks and lock picks are **fully data-driven** — add your own custom tiers
 ### Lock Picking Minigame
 Pick locks with an interactive pin-matching minigame. Match each pin to crack the combination. Higher-tier picks are more effective against tougher locks.
 
-**Lock Picks:** Wood, Copper, Iron, Steel, Gold, Diamond (+ custom)
+**Lock Picks:** Wood, Bobby Pin (copper), Iron, Steel, Gold, Diamond (+ custom)
 
 ### Keys & Key Rings
 Craft **keys** that match your locks, or use a **Key Ring** to carry multiple keys. A **Master Key** opens any lock.
 
-### Three Enchantments
+### Six Enchantments
 - **Shocking** — Zaps players who fail a pick attempt (bypasses armor)
 - **Sturdy** — Reduces pick effectiveness
 - **Complexity** — Blocks lower-tier picks entirely
+- **Silent** — Suppresses the rattle sound when access is denied
+- **Auto-Pick** — Chance to instantly open the lock, bypassing the minigame
+- **Reinforced** — Increases explosion resistance per level
+
+Each enchantment can be individually enabled or disabled in the server config.
 
 ### Full Protection
 Locked blocks are protected from:
@@ -50,8 +55,16 @@ Locked blocks are protected from:
 - Explosions
 - Breaking (configurable)
 
+### Loot-Scaled Lock Generation
+Lock tier is determined by the **value of a chest's loot table contents**. Village chests get wood or copper locks, while end city chests get gold or diamond locks. Chests with low-value loot get no lock at all.
+
+- **Multi-sample averaging** — each loot table is sampled 32 times and averaged for consistent tier assignments across server restarts.
+- **Sub-linear stack count** — item value scales with the square root of stack size, so 64 cobblestone doesn't outrank a diamond sword.
+- **Item value overrides** — configurable per-item base values for materials like diamonds, emeralds, and netherite that are valuable but have common rarity. 15 vanilla items have sensible defaults.
+- Fully configurable with per-tier value thresholds, rarity multipliers, and enchantment bonuses. Can be switched to random weighted selection if preferred.
+
 ### World Integration
-- Locked chests spawn naturally in the overworld
+- Locked chests spawn naturally in structures with loot-value-scaled tiers
 - Lock picks and mechanisms found in dungeon and temple loot
 - Toolsmith villagers sell lock picks and mechanisms
 - Wandering traders offer rare picks and enchanted locks
@@ -155,9 +168,10 @@ Lock mechanisms (Wood, Copper, Iron, Steel) are basic crafting components — th
 All settings are customizable via config files. Note that `locks-server.toml` is **per-world** and lives in a different location than the other two:
 
 **`config/locks-common.toml`** — World generation and item stats
-- **Generation Chance** — How often locks appear on generated chests (default: 85%)
+- **Generation Chance** — How often locks appear on generated chests (default: 85%, only used when loot-scaled locks is disabled)
 - **Enchant Chance** — How often generated locks are enchanted (default: 40%)
 - **Generated Locks / Weights** — Which lock tiers appear in worldgen and their relative rarity
+- **Loot-Scaled Locks** — Lock tier based on chest loot value (enabled by default). Configurable item values, rarity multipliers, enchantment bonuses, per-tier value thresholds, sample count, and per-item value overrides
 - **Lock Stats / Lockpick Stats** — Per-tier stat overrides (see above)
 
 **`saves/<world>/serverconfig/locks-server.toml`** — Server-side gameplay rules (generated per-world on first load)
@@ -168,6 +182,7 @@ All settings are customizable via config files. Note that `locks-server.toml` is
 - **Protect Lockables** — Whether locked blocks are break-proof in survival (default: true)
 - **Easy Lock** — One-click lock placement (default: true)
 - **Hide Lock ID / Hide HUD Enchantments** — Tooltip display options
+- **Enchantment Toggles** — Individually enable or disable each of the 6 enchantments
 
 **`config/locks-client.toml`** — Client-side settings
 - **Deaf Mode** — Visual feedback for lock picking accessibility (default: true)

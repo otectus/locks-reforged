@@ -11,6 +11,7 @@ import melonslise.locks.Locks;
 import melonslise.locks.common.capability.ILockableHandler;
 import melonslise.locks.common.capability.ISelection;
 import melonslise.locks.common.compat.CuriosHelper;
+import melonslise.locks.common.init.LocksEnchantments;
 import melonslise.locks.common.config.LocksClientConfig;
 import melonslise.locks.common.config.LocksServerConfig;
 import melonslise.locks.common.container.KeyRingContainer;
@@ -26,13 +27,16 @@ import melonslise.locks.common.item.LockPickItem;
 import melonslise.locks.common.item.LockingItem;
 import melonslise.locks.common.util.Lockable;
 import melonslise.locks.common.util.LocksUtil;
+import melonslise.locks.common.util.LootValueCalculator;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.util.GsonHelper;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.npc.VillagerProfession;
@@ -59,6 +63,8 @@ import net.minecraftforge.event.village.VillagerTradesEvent;
 import net.minecraftforge.event.village.WandererTradesEvent;
 import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.event.level.ChunkEvent;
+import net.minecraftforge.event.level.LevelEvent;
+import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.Event;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -96,6 +102,19 @@ public final class LocksForgeEvents
 	public static void addReloadListeners(AddReloadListenerEvent e)
 	{
 		e.addListener(new LockStatsReloadListener());
+	}
+
+	@SubscribeEvent
+	public static void onLevelLoad(LevelEvent.Load e)
+	{
+		if (e.getLevel() instanceof ServerLevel level && level.dimension() == Level.OVERWORLD)
+			LootValueCalculator.precomputeAll(level.getServer());
+	}
+
+	@SubscribeEvent
+	public static void onServerStopped(ServerStoppedEvent e)
+	{
+		LootValueCalculator.clearCache();
 	}
 
 	private static final Gson LOOT_GSON = net.minecraft.world.level.storage.loot.Deserializers.createLootTableSerializer().create();
@@ -200,7 +219,10 @@ public final class LocksForgeEvents
 				intersect.add(lkb);
 		if(intersect.isEmpty())
 			return;
-		if(e.getHand() != InteractionHand.MAIN_HAND) // FIXME Better way to prevent firing multiple times
+		// PlayerInteractEvent.RightClickBlock fires once per hand. We process only MAIN_HAND
+		// and deny block interaction on OFFHAND to prevent double-firing. This is correct even
+		// with shields or other offhand items — Forge fires the main-hand event independently.
+		if(e.getHand() != InteractionHand.MAIN_HAND)
 		{
 			e.setUseBlock(Event.Result.DENY);
 			return;
@@ -217,15 +239,26 @@ public final class LocksForgeEvents
 
 			if(LocksTagHelper.isLockPick(stack))
 			{
-				// Lock pick: open lock picking minigame
+				// Lock pick: open lock picking minigame (or auto-pick if enchanted)
 				if(!LockPickItem.canPick(stack, lkb))
 				{
 					if(world.isClientSide)
 						player.displayClientMessage(LockPickItem.TOO_COMPLEX_MESSAGE, true);
 				}
-				else if(!world.isClientSide)
+				else
 				{
-					NetworkHooks.openScreen((ServerPlayer) player, new LockPickingContainer.Provider(InteractionHand.MAIN_HAND, lkb), new LockPickingContainer.Writer(InteractionHand.MAIN_HAND, lkb));
+					int autoPick = LocksServerConfig.ENABLE_AUTO_PICK.get() ? EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.AUTO_PICK.get(), lkb.stack) : 0;
+					if(autoPick > 0 && !world.isClientSide && world.getRandom().nextFloat() < autoPick * 0.10f)
+					{
+						// Auto-Pick triggered: instant unlock without minigame
+						lkb.lock.setLocked(false);
+						world.playSound(null, pos, LocksSoundEvents.LOCK_OPEN.get(), SoundSource.BLOCKS, 1f, 1f);
+						LocksUtil.resolveLootTables(world, lkb, player);
+					}
+					else if(!world.isClientSide)
+					{
+						NetworkHooks.openScreen((ServerPlayer) player, new LockPickingContainer.Provider(InteractionHand.MAIN_HAND, lkb), new LockPickingContainer.Writer(InteractionHand.MAIN_HAND, lkb));
+					}
 				}
 			}
 			else if(stack.getItem() == LocksItems.MASTER_KEY.get())
@@ -321,11 +354,14 @@ public final class LocksForgeEvents
 				}
 				else
 				{
-					// No matching item anywhere: rattle
+					// No matching item anywhere: rattle (unless Silent enchantment)
 					lkb.swing(20);
-					world.playSound(player, pos, LocksSoundEvents.LOCK_RATTLE.get(), SoundSource.BLOCKS, 1f, 1f);
-					if(world.isClientSide && LocksClientConfig.DEAF_MODE.get())
-						player.displayClientMessage(LOCKED_MESSAGE, true);
+					if(!LocksServerConfig.ENABLE_SILENT.get() || EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.SILENT.get(), lkb.stack) == 0)
+					{
+						world.playSound(player, pos, LocksSoundEvents.LOCK_RATTLE.get(), SoundSource.BLOCKS, 1f, 1f);
+						if(world.isClientSide && LocksClientConfig.DEAF_MODE.get())
+							player.displayClientMessage(LOCKED_MESSAGE, true);
+					}
 				}
 			}
 
