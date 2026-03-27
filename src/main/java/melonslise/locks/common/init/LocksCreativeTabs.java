@@ -31,6 +31,7 @@ public final class LocksCreativeTabs
 				output.accept(LocksItems.STEEL_LOCK.get());
 				output.accept(LocksItems.GOLD_LOCK.get());
 				output.accept(LocksItems.DIAMOND_LOCK.get());
+				output.accept(LocksItems.NETHERITE_LOCK.get());
 
 				output.accept(LocksItems.KEY.get());
 				output.accept(LocksItems.MASTER_KEY.get());
@@ -42,6 +43,7 @@ public final class LocksCreativeTabs
 				output.accept(LocksItems.STEEL_LOCK_PICK.get());
 				output.accept(LocksItems.GOLD_LOCK_PICK.get());
 				output.accept(LocksItems.DIAMOND_LOCK_PICK.get());
+				output.accept(LocksItems.NETHERITE_LOCK_PICK.get());
 			})
 			.build());
 

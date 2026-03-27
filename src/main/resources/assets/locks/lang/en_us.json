@@ -12,12 +12,14 @@
 	"item.locks.steel_lock": "Steel Lock",
 	"item.locks.gold_lock": "Gold Plated Lock",
 	"item.locks.diamond_lock": "Diamond Plated Lock",
+	"item.locks.netherite_lock": "Netherite Lock",
 	"item.locks.copper_lock_pick": "Bobby Pin Lock Pick",
 	"item.locks.wood_lock_pick": "Wood Lock Pick",
 	"item.locks.iron_lock_pick": "Iron Lock Pick",
 	"item.locks.steel_lock_pick": "Steel Lock Pick",
 	"item.locks.gold_lock_pick": "Gold Lock Pick",
 	"item.locks.diamond_lock_pick": "Diamond Lock Pick",
+	"item.locks.netherite_lock_pick": "Netherite Lock Pick",
 	"item.locks.key": "Key",
 	"item.locks.master_key": "Master Key",
 	"item.locks.key_blank": "Key Blank",
@@ -35,6 +37,8 @@
 	"enchantment.locks.auto_pick.desc": "Gives a chance for lock picks to instantly open the lock",
 	"enchantment.locks.reinforced": "Reinforced",
 	"enchantment.locks.reinforced.desc": "Increases the lock's explosion resistance",
+	"enchantment.locks.awareness": "Awareness",
+	"enchantment.locks.awareness.desc": "Remembers its owner; they can open it without a key",
 
 	"death.attack.locks.shock": "%1$s was electrocuted after failing to pick an enchanted lock",
 	"death.attack.locks.shock.player": "%1$s was electrocuted by an enchanted lock whilst simultaneously picking it and fighting off %2$s",
@@ -53,6 +57,7 @@
 	"locks.tooltip.id": "ID: %s",
 	"locks.tooltip.length":  "Length: %s",
 	"locks.tooltip.strength": "Strength: %s",
+	"locks.tooltip.owned": "Aware (Owner-Bound)",
 
 	"locks.status.locked": "This block is locked",
 	"locks.status.too_complex": "This lock is too complex for this lock pick"

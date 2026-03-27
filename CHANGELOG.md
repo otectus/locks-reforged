@@ -1,5 +1,61 @@
 # Locks Reforged Changelog
 
+## 1.4.2
+
+### Netherite Lock Pick
+- Netherite lock picks now use durability instead of being consumed outright when a failed pin attempt triggers a break.
+- Added **128 durability** to the Netherite Lock Pick.
+- Netherite lock picks can now be repaired with **Netherite Ingots** in an anvil.
+- Netherite lock picks can now receive **Mending**.
+- **Netherite Lockpick Unbreakable** now prevents durability loss entirely instead of only preventing the item from being deleted.
+
+### Bug Fixes
+- Fixed loot-scaled lock generation causing massive startup logspam from sampled loot functions such as invalid `SetItemDamageFunction` rolls on non-damageable items.
+- Fixed loot-scaled lock generation crashing some modpacks by invoking loot-table behavior that performed structure lookups, world generation, or block-state access during startup/off-thread precomputation.
+- Reworked loot value calculation to estimate chest value directly from loot table JSON data instead of executing live loot generation.
+- When a chest loot table cannot be estimated safely, lock generation now falls back to the old random weighted system instead of failing or crashing world load.
+
+## 1.4.1
+
+### Bug Fixes
+- Fixed locks not generating on chests during initial world creation. The async loot value pre-computation introduced in v1.4.0 left the cache empty during spawn area generation, causing all chests to receive no locks. Now falls back to random weighted lock selection while pre-computation runs in the background.
+
+## 1.4.0
+
+### Netherite Lock & Lock Pick
+- Added **Netherite Lock** — the strongest lock tier with 14 pins, 200 explosion resistance, and 8 enchantability. Crafted at a smithing table from a Diamond Lock + Netherite Ingot + Netherite Upgrade Template.
+- Added **Netherite Lock Pick** — strength 0.95, making it nearly unbreakable. Crafted at a smithing table from a Diamond Lock Pick + Netherite Ingot + Netherite Upgrade Template.
+- Both netherite items are **fire-resistant** and survive in lava, like vanilla netherite gear.
+- Added **Netherite Lockpick Unbreakable** server config option (off by default). When enabled, netherite lock picks never break during lock picking.
+- Netherite lock picks are sold by level 5 toolsmith villagers (16 emeralds). Enchanted netherite locks are offered by wandering traders (40 emeralds).
+- Added to loot-scaled lock generation with a value threshold of 60.0 (the highest tier).
+
+### Awareness Enchantment
+- Added **Awareness** enchantment (max level I, very rare). When an Awareness-enchanted lock is placed, it remembers who placed it. That player can open and re-lock it with a bare hand — no key needed.
+- Works with overlapping locks: each lock independently tracks its owner, so multiple players' Awareness locks at the same position each work correctly.
+- Configurable via **Enable Awareness** toggle in the server config (on by default).
+- Shows "Aware (Owner-Bound)" tooltip on locks that have an owner.
+
+### New Config
+- Added **Netherite Lock** stat overrides (Length, Enchantment Value, Resistance) in the common config.
+- Added **Netherite Lockpick Strength** override in the common config.
+- Added **Netherite Lockpick Unbreakable** toggle in the server config.
+- Added **Enable Awareness** enchantment toggle in the server config.
+
+### Bug Fixes
+- Fixed world loading hang in modpacks caused by synchronous loot table pre-computation blocking the server thread. Loot values are now computed asynchronously on a background thread. Chests generated before pre-computation finishes gracefully fall back to no lock.
+- Fixed lockpicking GUI rendering corruption (textures smeared/repeated vertically) when using rendering optimization mods like **ImmediatelyFast** or **Embeddium**. Migrated all lockpicking screen rendering from raw Tesselator calls to `GuiGraphics.blit()`, which optimization mods handle correctly.
+- Fixed potential `IndexOutOfBoundsException` crash in lock generation if the "Generated Lock Chances" config list was shorter than the "Generated Locks" list (e.g. from manual config editing). Now uses safe bounds checking with a warning log.
+- Fixed potential crash in random lock generation if the weighted lock map was empty (e.g. all weights set to 0).
+
+## 1.3.3
+
+### New Config
+- Added **Hide HUD Tooltip** server config option under Display. When enabled, the floating tooltip that appears in the world when looking at a lock while holding a lockpick is completely hidden (item name, enchantments, and all other info). Off by default.
+
+### Bug Fixes
+- Fixed lockpick controls remaining active after a lockpick breaks — holding left/right during a break would cause the new lockpick to slide on its own and break the break animation.
+
 ## 1.3.2
 
 ### Loot-Scaled Lock Generation

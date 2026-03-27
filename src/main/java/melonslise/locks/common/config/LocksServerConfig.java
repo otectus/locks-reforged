@@ -33,6 +33,7 @@ public class LocksServerConfig
 
 	public static final ForgeConfigSpec.BooleanValue HIDE_LOCK_ID;
 	public static final ForgeConfigSpec.BooleanValue HIDE_HUD_ENCHANTMENTS;
+	public static final ForgeConfigSpec.BooleanValue HIDE_HUD_TOOLTIP;
 
 	public static final ForgeConfigSpec.BooleanValue ENABLE_SHOCKING;
 	public static final ForgeConfigSpec.BooleanValue ENABLE_STURDY;
@@ -40,6 +41,9 @@ public class LocksServerConfig
 	public static final ForgeConfigSpec.BooleanValue ENABLE_SILENT;
 	public static final ForgeConfigSpec.BooleanValue ENABLE_AUTO_PICK;
 	public static final ForgeConfigSpec.BooleanValue ENABLE_REINFORCED;
+	public static final ForgeConfigSpec.BooleanValue ENABLE_AWARENESS;
+
+	public static final ForgeConfigSpec.BooleanValue NETHERITE_PICK_UNBREAKABLE;
 
 	public static Pattern[] lockableBlocks;
 	public static List<TagKey<Block>> lockableTags;
@@ -74,6 +78,9 @@ public class LocksServerConfig
 		HIDE_HUD_ENCHANTMENTS = cfg
 			.comment("Hide enchantment lines from the HUD floating tooltip (inventory tooltips are unaffected)")
 			.define("Hide HUD Enchantments", false);
+		HIDE_HUD_TOOLTIP = cfg
+			.comment("Hide the floating HUD tooltip entirely when looking at a lock in the world (hides item name, enchantments, and all other info)")
+			.define("Hide HUD Tooltip", false);
 		cfg.pop();
 
 		cfg.comment("Enable or disable individual lock enchantments. Disabled enchantments will not appear in the enchanting table, trades, or loot, and their effects will be ignored on existing items.").push("Enchantments");
@@ -95,7 +102,14 @@ public class LocksServerConfig
 		ENABLE_REINFORCED = cfg
 			.comment("Increases explosion resistance of locked blocks")
 			.define("Enable Reinforced", true);
+		ENABLE_AWARENESS = cfg
+			.comment("Remembers who placed the lock; that player can open it without a key")
+			.define("Enable Awareness", true);
 		cfg.pop();
+
+		NETHERITE_PICK_UNBREAKABLE = cfg
+			.comment("When enabled, netherite lock picks never lose durability or break during lock picking")
+			.define("Netherite Lockpick Unbreakable", false);
 
 		SPEC = cfg.build();
 	}
@@ -128,6 +142,7 @@ public class LocksServerConfig
 		if (enchantment == LocksEnchantments.SILENT.get()) return ENABLE_SILENT.get();
 		if (enchantment == LocksEnchantments.AUTO_PICK.get()) return ENABLE_AUTO_PICK.get();
 		if (enchantment == LocksEnchantments.REINFORCED.get()) return ENABLE_REINFORCED.get();
+		if (enchantment == LocksEnchantments.AWARENESS.get()) return ENABLE_AWARENESS.get();
 		return true;
 	}
 

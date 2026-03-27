@@ -36,10 +36,11 @@ public final class LocksConfig
 	public static final ForgeConfigSpec.IntValue STEEL_LOCK_LENGTH, STEEL_LOCK_ENCHANT, STEEL_LOCK_RESISTANCE;
 	public static final ForgeConfigSpec.IntValue GOLD_LOCK_LENGTH, GOLD_LOCK_ENCHANT, GOLD_LOCK_RESISTANCE;
 	public static final ForgeConfigSpec.IntValue DIAMOND_LOCK_LENGTH, DIAMOND_LOCK_ENCHANT, DIAMOND_LOCK_RESISTANCE;
+	public static final ForgeConfigSpec.IntValue NETHERITE_LOCK_LENGTH, NETHERITE_LOCK_ENCHANT, NETHERITE_LOCK_RESISTANCE;
 
 	// Lockpick stat overrides (sentinel -1.0 = use JSON default)
 	public static final ForgeConfigSpec.DoubleValue WOOD_PICK_STRENGTH, COPPER_PICK_STRENGTH, IRON_PICK_STRENGTH, STEEL_PICK_STRENGTH;
-	public static final ForgeConfigSpec.DoubleValue GOLD_PICK_STRENGTH, DIAMOND_PICK_STRENGTH;
+	public static final ForgeConfigSpec.DoubleValue GOLD_PICK_STRENGTH, DIAMOND_PICK_STRENGTH, NETHERITE_PICK_STRENGTH;
 
 	// Loot-scaled lock generation
 	public static final ForgeConfigSpec.BooleanValue LOOT_SCALED_LOCKS;
@@ -70,10 +71,10 @@ public final class LocksConfig
 			.defineInRange("Generation Enchant Chance", 0.4d, 0d, 1d);
 		GENERATED_LOCKS = cfg
 			.comment("Items that can be generated as locks (must be instance of LockItem in code!)")
-			.defineList("Generated Locks", Lists.newArrayList("locks:wood_lock", "locks:copper_lock", "locks:iron_lock", "locks:steel_lock", "locks:gold_lock", "locks:diamond_lock"), e -> e instanceof String);
+			.defineList("Generated Locks", Lists.newArrayList("locks:wood_lock", "locks:copper_lock", "locks:iron_lock", "locks:steel_lock", "locks:gold_lock", "locks:diamond_lock", "locks:netherite_lock"), e -> e instanceof String);
 		GENERATED_LOCK_WEIGHTS= cfg
 			.comment("WARNING: THE AMOUNT OF NUMBERS SHOULD BE EQUAL TO THE AMOUNT OF GENERATED LOCK ITEMS!!!", "The relative probability that the corresponding lock item will be generated on a chest. Higher number = higher chance to generate")
-			.defineList("Generated Lock Chances", Lists.newArrayList(3, 3, 3, 2, 2, 1), e -> e instanceof Integer);
+			.defineList("Generated Lock Chances", Lists.newArrayList(3, 3, 3, 2, 2, 1, 1), e -> e instanceof Integer);
 		RANDOMIZE_LOADED_LOCKS = cfg
 			.comment("Randomize lock IDs and combinations when loading them from a structure file. Randomization works just like during world generation")
 			.define("Randomize Loaded Locks", false);
@@ -117,6 +118,12 @@ public final class LocksConfig
 		DIAMOND_LOCK_RESISTANCE = cfg.comment("Explosion resistance (0-1000). JSON default: 100.").defineInRange("Resistance", -1, -1, 1000);
 		cfg.pop();
 
+		cfg.push("Netherite Lock");
+		NETHERITE_LOCK_LENGTH = cfg.comment("Number of pins (1-20). JSON default: 14. Set to -1 to use default.").defineInRange("Length", -1, -1, 20);
+		NETHERITE_LOCK_ENCHANT = cfg.comment("Enchantability (1-50). JSON default: 8.").defineInRange("Enchantment Value", -1, -1, 50);
+		NETHERITE_LOCK_RESISTANCE = cfg.comment("Explosion resistance (0-1000). JSON default: 200.").defineInRange("Resistance", -1, -1, 1000);
+		cfg.pop();
+
 		cfg.pop(); // Lock Stats
 
 		// Lockpick Stats section
@@ -127,6 +134,7 @@ public final class LocksConfig
 		STEEL_PICK_STRENGTH = cfg.comment("Strength (0.01-10.0). JSON default: 0.7.").defineInRange("Steel Lockpick Strength", -1.0, -1.0, 10.0);
 		GOLD_PICK_STRENGTH = cfg.comment("Strength (0.01-10.0). JSON default: 0.25.").defineInRange("Gold Lockpick Strength", -1.0, -1.0, 10.0);
 		DIAMOND_PICK_STRENGTH = cfg.comment("Strength (0.01-10.0). JSON default: 0.85.").defineInRange("Diamond Lockpick Strength", -1.0, -1.0, 10.0);
+		NETHERITE_PICK_STRENGTH = cfg.comment("Strength (0.01-10.0). JSON default: 0.95.").defineInRange("Netherite Lockpick Strength", -1.0, -1.0, 10.0);
 		cfg.pop(); // Lockpick Stats
 
 		// Loot-Scaled Locks section
@@ -157,8 +165,8 @@ public final class LocksConfig
 				"WARNING: THE AMOUNT OF NUMBERS SHOULD BE EQUAL TO THE AMOUNT OF GENERATED LOCK ITEMS!!!",
 				"A chest's total loot value is compared against these thresholds to select the lock tier.",
 				"If the value is below the lowest threshold, no lock is generated.",
-				"Defaults: wood=3, copper=6, iron=10, steel=16, gold=24, diamond=40")
-			.defineList("Loot Value Tiers", Lists.newArrayList(3.0, 6.0, 10.0, 16.0, 24.0, 40.0), e -> e instanceof Double);
+				"Defaults: wood=3, copper=6, iron=10, steel=16, gold=24, diamond=40, netherite=60")
+			.defineList("Loot Value Tiers", Lists.newArrayList(3.0, 6.0, 10.0, 16.0, 24.0, 40.0, 60.0), e -> e instanceof Double);
 		LOOT_VALUE_SAMPLES = cfg
 			.comment("Number of times each loot table is sampled to compute its average value.",
 				"Higher values produce more consistent tier assignments across server restarts but slightly increase startup time.")
@@ -198,7 +206,9 @@ public final class LocksConfig
 		weightTotal = 0;
 		List<? extends String> locks = GENERATED_LOCKS.get();
 		List<? extends Integer> weights = GENERATED_LOCK_WEIGHTS.get();
-		for(int a = 0; a < locks.size(); ++a)
+		if (weights.size() != locks.size())
+			Locks.LOGGER.warn("Generated Lock Chances list size ({}) doesn't match Generated Locks list size ({}). Some locks may not appear.", weights.size(), locks.size());
+		for(int a = 0; a < Math.min(locks.size(), weights.size()); ++a)
 		{
 			weightTotal += weights.get(a);
 			weightedGeneratedLocks.put(weightTotal, ForgeRegistries.ITEMS.getValue(new ResourceLocation(locks.get(a))));
@@ -252,8 +262,10 @@ public final class LocksConfig
 	{
 		var entry = lootValueTierMap.floorEntry(lootValue);
 		if (entry == null)
-			return null;
+			return ItemStack.EMPTY;
 		ItemStack stack = new ItemStack(entry.getValue());
+		if (stack.isEmpty())
+			return ItemStack.EMPTY;
 		if (!canEnchant(rng))
 			return stack;
 		stack = EnchantmentHelper.enchantItem(rng, stack, 5 + rng.nextInt(30), false);
@@ -265,7 +277,12 @@ public final class LocksConfig
 
 	public static ItemStack getRandomLock(RandomSource rng)
 	{
-		ItemStack stack = new ItemStack(weightedGeneratedLocks.ceilingEntry(rng.nextInt(weightTotal) + 1).getValue());
+		if (weightTotal <= 0 || weightedGeneratedLocks.isEmpty())
+			return ItemStack.EMPTY;
+		var entry = weightedGeneratedLocks.ceilingEntry(rng.nextInt(weightTotal) + 1);
+		if (entry == null)
+			return ItemStack.EMPTY;
+		ItemStack stack = new ItemStack(entry.getValue());
 		if (!canEnchant(rng))
 			return stack;
 		stack = EnchantmentHelper.enchantItem(rng, stack, 5 + rng.nextInt(30), false);
@@ -287,6 +304,7 @@ public final class LocksConfig
 		applyLockConfigOverride("steel_lock", STEEL_LOCK_LENGTH, STEEL_LOCK_ENCHANT, STEEL_LOCK_RESISTANCE);
 		applyLockConfigOverride("gold_lock", GOLD_LOCK_LENGTH, GOLD_LOCK_ENCHANT, GOLD_LOCK_RESISTANCE);
 		applyLockConfigOverride("diamond_lock", DIAMOND_LOCK_LENGTH, DIAMOND_LOCK_ENCHANT, DIAMOND_LOCK_RESISTANCE);
+		applyLockConfigOverride("netherite_lock", NETHERITE_LOCK_LENGTH, NETHERITE_LOCK_ENCHANT, NETHERITE_LOCK_RESISTANCE);
 
 		applyPickConfigOverride("wood_lock_pick", WOOD_PICK_STRENGTH);
 		applyPickConfigOverride("copper_lock_pick", COPPER_PICK_STRENGTH);
@@ -294,6 +312,7 @@ public final class LocksConfig
 		applyPickConfigOverride("steel_lock_pick", STEEL_PICK_STRENGTH);
 		applyPickConfigOverride("gold_lock_pick", GOLD_PICK_STRENGTH);
 		applyPickConfigOverride("diamond_lock_pick", DIAMOND_PICK_STRENGTH);
+		applyPickConfigOverride("netherite_lock_pick", NETHERITE_PICK_STRENGTH);
 	}
 
 	private static void applyLockConfigOverride(String name, ForgeConfigSpec.IntValue length, ForgeConfigSpec.IntValue enchant, ForgeConfigSpec.IntValue resistance)

@@ -2,6 +2,7 @@ package melonslise.locks.common.init;
 
 import melonslise.locks.Locks;
 import melonslise.locks.common.enchantment.AutoPickEnchantment;
+import melonslise.locks.common.enchantment.AwarenessEnchantment;
 import melonslise.locks.common.enchantment.ComplexityEnchantment;
 import melonslise.locks.common.enchantment.ReinforcedEnchantment;
 import melonslise.locks.common.enchantment.ShockingEnchantment;
@@ -27,7 +28,8 @@ public final class LocksEnchantments
 		COMPLEXITY = ENCHANTMENTS.register("complexity", ComplexityEnchantment::new),
 		SILENT = ENCHANTMENTS.register("silent", SilentEnchantment::new),
 		AUTO_PICK = ENCHANTMENTS.register("auto_pick", AutoPickEnchantment::new),
-		REINFORCED = ENCHANTMENTS.register("reinforced", ReinforcedEnchantment::new);
+		REINFORCED = ENCHANTMENTS.register("reinforced", ReinforcedEnchantment::new),
+		AWARENESS = ENCHANTMENTS.register("awareness", AwarenessEnchantment::new);
 
 	private LocksEnchantments() {}
 

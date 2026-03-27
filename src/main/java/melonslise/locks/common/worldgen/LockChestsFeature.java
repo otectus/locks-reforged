@@ -38,23 +38,31 @@ public class LockChestsFeature extends Feature<NoneFeatureConfiguration>
 		RandomSource rng = context.random();
 		BlockPos pos = context.origin();
 
-		ItemStack stack;
+		ItemStack stack = ItemStack.EMPTY;
+		boolean usedLootScaling = false;
 		if (LocksConfig.LOOT_SCALED_LOCKS.get())
 		{
 			BlockEntity be = world.getBlockEntity(pos);
-			if (!(be instanceof RandomizableContainerBlockEntity container) || container.lootTable == null)
-				return false;
-			double lootValue = LootValueCalculator.getCachedLootValue(container.lootTable);
-			stack = LocksConfig.getLockForLootValue(lootValue, rng);
-			if (stack == null)
-				return false;
+			if (be instanceof RandomizableContainerBlockEntity container && container.lootTable != null)
+			{
+				double lootValue = LootValueCalculator.getLootValue(world.getLevel().getServer(), container.lootTable);
+				if (!Double.isNaN(lootValue))
+				{
+					stack = LocksConfig.getLockForLootValue(lootValue, rng);
+					usedLootScaling = true;
+				}
+			}
 		}
-		else
+
+		if (!usedLootScaling)
 		{
 			if (!LocksConfig.canGen(rng))
 				return false;
 			stack = LocksConfig.getRandomLock(rng);
 		}
+
+		if (stack.isEmpty())
+			return false;
 
 		BlockState state = world.getBlockState(pos);
 		BlockPos pos1 = state.getValue(ChestBlock.TYPE) == ChestType.SINGLE || ModList.get().isLoaded("lootr") ? pos : pos.relative(ChestBlock.getConnectedDirection(state));

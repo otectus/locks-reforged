@@ -11,7 +11,7 @@ Locks is a small but unique mod that lets you attach flexible, universal locks t
 ### Lock Any Block
 Attach locks to **any block** — not just chests. Doors, trapdoors, furnaces, dispensers, hoppers, and modded blocks all work. Locks are spatial, so a single lock can cover multiple blocks at once.
 
-### Six Tiers of Locks (+ Custom!)
+### Seven Tiers of Locks (+ Custom!)
 
 | Tier | Pins | Enchantability | Resistance | Pick Strength |
 |------|------|----------------|------------|---------------|
@@ -21,29 +21,33 @@ Attach locks to **any block** — not just chests. Doors, trapdoors, furnaces, d
 | Gold | 6 | 22 | 6 | 0.25 |
 | Steel | 9 | 12 | 20 | 0.70 |
 | Diamond | 11 | 10 | 100 | 0.85 |
+| Netherite | 14 | 8 | 200 | 0.95 |
 
 - **Pins** — Number of pins in the lock picking minigame. More pins = harder to pick.
 - **Enchantability** — How likely the lock is to receive powerful enchantments.
-- **Resistance** — Explosion resistance. Diamond locks are virtually indestructible.
+- **Resistance** — Explosion resistance. Diamond and Netherite locks are virtually indestructible.
 - **Pick Strength** — How effective the matching lock pick is. Higher = better.
+
+Netherite items are **fire-resistant** and survive in lava, just like vanilla netherite gear. They're crafted at a smithing table using a Netherite Upgrade Template.
 
 All locks and lock picks are **fully data-driven** — add your own custom tiers via simple JSON files, or tweak existing stats through config files, TOML overrides, or datapacks. No code changes needed!
 
 ### Lock Picking Minigame
 Pick locks with an interactive pin-matching minigame. Match each pin to crack the combination. Higher-tier picks are more effective against tougher locks.
 
-**Lock Picks:** Wood, Bobby Pin (copper), Iron, Steel, Gold, Diamond (+ custom)
+**Lock Picks:** Wood, Bobby Pin (copper), Iron, Steel, Gold, Diamond, Netherite (+ custom)
 
 ### Keys & Key Rings
 Craft **keys** that match your locks, or use a **Key Ring** to carry multiple keys. A **Master Key** opens any lock.
 
-### Six Enchantments
+### Seven Enchantments
 - **Shocking** — Zaps players who fail a pick attempt (bypasses armor)
 - **Sturdy** — Reduces pick effectiveness
 - **Complexity** — Blocks lower-tier picks entirely
 - **Silent** — Suppresses the rattle sound when access is denied
 - **Auto-Pick** — Chance to instantly open the lock, bypassing the minigame
 - **Reinforced** — Increases explosion resistance per level
+- **Awareness** — Remembers who placed the lock; that player can open it without a key
 
 Each enchantment can be individually enabled or disabled in the server config.
 
@@ -182,7 +186,8 @@ All settings are customizable via config files. Note that `locks-server.toml` is
 - **Protect Lockables** — Whether locked blocks are break-proof in survival (default: true)
 - **Easy Lock** — One-click lock placement (default: true)
 - **Hide Lock ID / Hide HUD Enchantments** — Tooltip display options
-- **Enchantment Toggles** — Individually enable or disable each of the 6 enchantments
+- **Enchantment Toggles** — Individually enable or disable each of the 7 enchantments
+- **Netherite Lockpick Unbreakable** — When enabled, netherite lock picks never break (default: false)
 
 **`config/locks-client.toml`** — Client-side settings
 - **Deaf Mode** — Visual feedback for lock picking accessibility (default: true)

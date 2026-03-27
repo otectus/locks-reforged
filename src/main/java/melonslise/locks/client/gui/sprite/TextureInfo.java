@@ -3,6 +3,8 @@ package melonslise.locks.client.gui.sprite;
 import com.mojang.blaze3d.vertex.PoseStack;
 
 import melonslise.locks.client.util.LocksClientUtil;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 
@@ -24,5 +26,10 @@ public class TextureInfo
 	public void draw(PoseStack mtx, float x, float y, float alpha)
 	{
 		LocksClientUtil.texture(mtx, x, y, this.startX, this.startY, this.width, this.height, this.canvasWidth, this.canvasHeight, alpha);
+	}
+
+	public void draw(GuiGraphics guiGraphics, ResourceLocation texture, float x, float y, float alpha)
+	{
+		LocksClientUtil.blitTexture(guiGraphics, texture, x, y, this.startX, this.startY, this.width, this.height, this.canvasWidth, this.canvasHeight, alpha);
 	}
 }

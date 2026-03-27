@@ -159,14 +159,24 @@ public class LockPickingContainer extends AbstractContainerMenu
 	protected boolean tryBreakPick(Player player, int pin)
 	{
 		ItemStack pickStack = player.getItemInHand(this.hand);
+		if (!LocksTagHelper.isLockPick(pickStack))
+			return false;
+		if (LocksServerConfig.NETHERITE_PICK_UNBREAKABLE.get()
+			&& LockPickItem.isNetheriteLockPick(pickStack))
+			return false;
 		float sturdyModifier = this.sturdy == 0 ? 1f : 0.75f + this.sturdy * 0.5f;
 		float ch = LockPickItem.getOrSetStrength(pickStack) / sturdyModifier;
 		float ex = (1f - ch) * (1f - this.getBreakChanceMultiplier(pin));
 
-		if (!LocksTagHelper.isLockPick(pickStack) || player.level().getRandom().nextFloat() < ex + ch)
+		if (player.level().getRandom().nextFloat() < ex + ch)
 			return false;
-		this.player.broadcastBreakEvent(this.hand);
-		pickStack.shrink(1);
+		if (LockPickItem.usesDurability(pickStack))
+			LockPickItem.damagePick(pickStack, player, this.hand);
+		else
+		{
+			this.player.broadcastBreakEvent(this.hand);
+			pickStack.shrink(1);
+		}
 		if (pickStack.isEmpty())
 			for (int a = 0; a < player.getInventory().getContainerSize(); ++a)
 			{

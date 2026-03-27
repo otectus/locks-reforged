@@ -27,16 +27,16 @@ The original Locks mod was built for Minecraft 1.16.5 (Forge 36.x). This port up
 Locks can be dynamically attached to **any** block in the game -- not just chests. This includes doors, trapdoors, furnaces, dispensers, hoppers, and blocks from other mods. Locks are spatial, meaning a single lock can cover multiple blocks at once.
 
 ### Data-Driven Locks & Lock Picks
-All lock and lock pick types are defined via JSON files, making it easy to add custom items or tweak stats without touching code. The mod ships with five default tiers of each, but you can add your own through the config folder or override stats via datapacks.
+All lock and lock pick types are defined via JSON files, making it easy to add custom items or tweak stats without touching code. The mod ships with seven default tiers of each (Wood through Netherite), but you can add your own through the config folder or override stats via datapacks.
 
 ### Items
 
 | Category | Items |
 |----------|-------|
-| **Locks** | Wood Lock, Iron Lock, Steel Lock, Gold Lock, Diamond Lock (+ custom) |
+| **Locks** | Wood, Copper, Iron, Steel, Gold, Diamond, Netherite (+ custom) |
 | **Keys** | Key Blank, Key, Master Key, Key Ring |
-| **Lock Picks** | Wood, Bobby Pin (copper), Iron, Steel, Gold, Diamond (+ custom) |
-| **Components** | Spring, Wood/Iron/Steel Lock Mechanisms |
+| **Lock Picks** | Wood, Bobby Pin (copper), Iron, Steel, Gold, Diamond, Netherite (+ custom) |
+| **Components** | Spring, Wood/Copper/Iron/Steel Lock Mechanisms |
 
 ### Lock Picking Minigame
 An interactive lock picking mechanic with a pin-matching system. Each lock has a unique combination based on its complexity. Higher-tier lock picks are more effective against tougher locks.
@@ -51,6 +51,7 @@ An interactive lock picking mechanic with a pin-matching system. Each lock has a
 | **Silent** | I | Suppresses the rattle sound when access is denied. Incompatible with Shocking |
 | **Auto-Pick** | III | 10%/20%/30% chance to instantly open the lock, bypassing the minigame. Incompatible with Complexity |
 | **Reinforced** | III | Increases explosion resistance by 50%/100%/150%. Protects against TNT and creepers |
+| **Awareness** | I | Remembers who placed the lock; that player can open it without a key |
 
 Each enchantment can be individually enabled or disabled in the server config.
 
@@ -91,7 +92,8 @@ On first launch, the mod creates these directories with a `_example.json.disable
 {
   "length": 7,
   "enchantment_value": 14,
-  "resistance": 12
+  "resistance": 12,
+  "fire_resistant": false
 }
 ```
 
@@ -100,17 +102,20 @@ On first launch, the mod creates these directories with a `_example.json.disable
 | `length` | Number of pins in the lock picking minigame |
 | `enchantment_value` | Enchantability (higher = better enchantments) |
 | `resistance` | Damage resistance of the lock |
+| `fire_resistant` | Whether the item survives in lava/fire (optional, default false) |
 
 **Lock pick definition schema:**
 ```json
 {
-  "strength": 0.35
+  "strength": 0.35,
+  "fire_resistant": false
 }
 ```
 
 | Field | Description |
 |-------|-------------|
 | `strength` | Pick effectiveness (0.0–1.0, higher = stronger) |
+| `fire_resistant` | Whether the item survives in lava/fire (optional, default false) |
 
 **Important:** Custom items added via config also need:
 - A model JSON in a resource pack (`assets/locks/models/item/<name>.json`)
@@ -165,7 +170,8 @@ Only fields present in the override are changed; omitted fields keep their defau
 - **Protect Lockables** -- Whether locked blocks are protected from being broken
 - **Hide Lock ID** -- Hides the lock ID line from both inventory and HUD tooltips (default: false)
 - **Hide HUD Enchantments** -- Hides enchantment lines from the HUD floating tooltip only; inventory tooltips are unaffected (default: false)
-- **Enchantment Toggles** -- Each of the 6 enchantments (Shocking, Sturdy, Complexity, Silent, Auto-Pick, Reinforced) can be individually enabled or disabled
+- **Enchantment Toggles** -- Each of the 7 enchantments (Shocking, Sturdy, Complexity, Silent, Auto-Pick, Reinforced, Awareness) can be individually enabled or disabled
+- **Netherite Lockpick Unbreakable** -- When enabled, netherite lock picks never break during lock picking (default: false)
 
 ## Building from Source
 

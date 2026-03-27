@@ -103,7 +103,7 @@ public final class LocksClientForgeEvents
 		Minecraft mc = Minecraft.getInstance();
 		if(e.getOverlay() != VanillaGuiOverlay.HOTBAR.type() || tooltipLockable == null)
 			return;
-		if(holdingPick(mc.player))
+		if(holdingPick(mc.player) && !LocksServerConfig.HIDE_HUD_TOOLTIP.get())
 		{
 			PoseStack mtx = e.getGuiGraphics().pose();
 			Vector3f vec = LocksClientUtil.worldToScreen(tooltipLockable.getLockState(mc.level).pos, e.getPartialTick());

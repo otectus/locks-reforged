@@ -38,8 +38,8 @@ public final class LocksItems
 	private static final Map<ResourceLocation, RegistryObject<Item>> LOCKPICK_ITEMS = new LinkedHashMap<>();
 
 	// Backward-compatible static fields (populated after loadDefinitions + register calls)
-	public static RegistryObject<Item> WOOD_LOCK, COPPER_LOCK, IRON_LOCK, STEEL_LOCK, GOLD_LOCK, DIAMOND_LOCK;
-	public static RegistryObject<Item> WOOD_LOCK_PICK, COPPER_LOCK_PICK, IRON_LOCK_PICK, STEEL_LOCK_PICK, GOLD_LOCK_PICK, DIAMOND_LOCK_PICK;
+	public static RegistryObject<Item> WOOD_LOCK, COPPER_LOCK, IRON_LOCK, STEEL_LOCK, GOLD_LOCK, DIAMOND_LOCK, NETHERITE_LOCK;
+	public static RegistryObject<Item> WOOD_LOCK_PICK, COPPER_LOCK_PICK, IRON_LOCK_PICK, STEEL_LOCK_PICK, GOLD_LOCK_PICK, DIAMOND_LOCK_PICK, NETHERITE_LOCK_PICK;
 
 	private LocksItems() {}
 
@@ -49,17 +49,23 @@ public final class LocksItems
 		LockTypeRegistry.loadDefinitions();
 
 		// Register data-driven locks
-		for (ResourceLocation id : LockTypeRegistry.allLockDefinitions().keySet())
+		for (var entry : LockTypeRegistry.allLockDefinitions().entrySet())
 		{
-			RegistryObject<Item> obj = ITEMS.register(id.getPath(), () -> new LockItem(new Item.Properties()));
-			LOCK_ITEMS.put(id, obj);
+			boolean fireRes = entry.getValue().fireResistant();
+			RegistryObject<Item> obj = ITEMS.register(entry.getKey().getPath(), () -> new LockItem(fireRes ? new Item.Properties().fireResistant() : new Item.Properties()));
+			LOCK_ITEMS.put(entry.getKey(), obj);
 		}
 
 		// Register data-driven lockpicks
-		for (ResourceLocation id : LockTypeRegistry.allLockPickDefinitions().keySet())
+		for (var entry : LockTypeRegistry.allLockPickDefinitions().entrySet())
 		{
-			RegistryObject<Item> obj = ITEMS.register(id.getPath(), () -> new LockPickItem(new Item.Properties()));
-			LOCKPICK_ITEMS.put(id, obj);
+			boolean fireRes = entry.getValue().fireResistant();
+			Item.Properties properties = fireRes ? new Item.Properties().fireResistant() : new Item.Properties();
+			if (LockPickItem.NETHERITE_LOCK_PICK_ID.equals(entry.getKey()))
+				properties = properties.durability(LockPickItem.NETHERITE_DURABILITY);
+			Item.Properties finalProperties = properties;
+			RegistryObject<Item> obj = ITEMS.register(entry.getKey().getPath(), () -> new LockPickItem(finalProperties));
+			LOCKPICK_ITEMS.put(entry.getKey(), obj);
 		}
 
 		// Populate backward-compatible static fields
@@ -69,6 +75,7 @@ public final class LocksItems
 		STEEL_LOCK = LOCK_ITEMS.get(new ResourceLocation(Locks.ID, "steel_lock"));
 		GOLD_LOCK = LOCK_ITEMS.get(new ResourceLocation(Locks.ID, "gold_lock"));
 		DIAMOND_LOCK = LOCK_ITEMS.get(new ResourceLocation(Locks.ID, "diamond_lock"));
+		NETHERITE_LOCK = LOCK_ITEMS.get(new ResourceLocation(Locks.ID, "netherite_lock"));
 
 		WOOD_LOCK_PICK = LOCKPICK_ITEMS.get(new ResourceLocation(Locks.ID, "wood_lock_pick"));
 		COPPER_LOCK_PICK = LOCKPICK_ITEMS.get(new ResourceLocation(Locks.ID, "copper_lock_pick"));
@@ -76,6 +83,7 @@ public final class LocksItems
 		STEEL_LOCK_PICK = LOCKPICK_ITEMS.get(new ResourceLocation(Locks.ID, "steel_lock_pick"));
 		GOLD_LOCK_PICK = LOCKPICK_ITEMS.get(new ResourceLocation(Locks.ID, "gold_lock_pick"));
 		DIAMOND_LOCK_PICK = LOCKPICK_ITEMS.get(new ResourceLocation(Locks.ID, "diamond_lock_pick"));
+		NETHERITE_LOCK_PICK = LOCKPICK_ITEMS.get(new ResourceLocation(Locks.ID, "netherite_lock_pick"));
 
 		ITEMS.register(FMLJavaModLoadingContext.get().getModEventBus());
 	}

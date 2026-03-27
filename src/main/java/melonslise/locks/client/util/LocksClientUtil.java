@@ -10,6 +10,8 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
@@ -123,6 +125,14 @@ public final class LocksClientUtil
 		return new Vector2f((1f - pos1.x) * w.getGuiScaledWidth() / 2f, (1f - pos1.y) * w.getGuiScaledHeight() / 2f);
 	}
 	*/
+
+	public static void blitTexture(GuiGraphics guiGraphics, ResourceLocation texture, float x, float y, int u, int v, int width, int height, int texWidth, int texHeight, float alpha)
+	{
+		RenderSystem.enableBlend();
+		RenderSystem.setShaderColor(1f, 1f, 1f, alpha);
+		guiGraphics.blit(texture, (int) x, (int) y, u, v, width, height, texWidth, texHeight);
+		RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+	}
 
 	public static void texture(PoseStack mtx, float x, float y, int u, int v, int width, int height, int texWidth, int texHeight, float alpha) // FIXME Cant batch like the others? Why? ;-;
 	{

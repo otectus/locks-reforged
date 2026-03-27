@@ -23,6 +23,7 @@ import melonslise.locks.common.init.LocksTagHelper;
 import melonslise.locks.common.init.LockStatsReloadListener;
 import melonslise.locks.common.init.LocksSoundEvents;
 import melonslise.locks.common.item.KeyRingItem;
+import melonslise.locks.common.item.LockItem;
 import melonslise.locks.common.item.LockPickItem;
 import melonslise.locks.common.item.LockingItem;
 import melonslise.locks.common.util.Lockable;
@@ -170,6 +171,7 @@ public final class LocksForgeEvents
 		trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.STEEL_LOCK_PICK.get()), 4, 2, 16, 20, 0.05f));
 		trades = levels.get(5);
 		trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.DIAMOND_LOCK_PICK.get()), 8, 2, 12, 30, 0.05f));
+		trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.NETHERITE_LOCK_PICK.get()), 16, 1, 6, 30, 0.05f));
 		trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.STEEL_LOCK_MECHANISM.get()), 8, 1, 8, 30, 0.2f));
 	}
 
@@ -184,6 +186,7 @@ public final class LocksForgeEvents
 		trades = e.getRareTrades();
 		trades.add(new VillagerTrades.ItemsForEmeralds(LocksItems.STEEL_LOCK_MECHANISM.get(), 6, 1, 4, 1));
 		trades.add(new VillagerTrades.EnchantedItemForEmeralds(LocksItems.DIAMOND_LOCK.get(), 28, 4, 1));
+		trades.add(new VillagerTrades.EnchantedItemForEmeralds(LocksItems.NETHERITE_LOCK.get(), 40, 4, 1));
 	}
 
 	@SubscribeEvent
@@ -321,46 +324,79 @@ public final class LocksForgeEvents
 			}
 			else
 			{
-				// Check curio slots for a key ring with matching key
-				ItemStack curioRing = CuriosHelper.findMatchingKeyRing(player, lkb.lock.id);
-				if (!curioRing.isEmpty())
+				// Check Awareness enchantment: scan all locked lockables for one owned by this player
+				boolean awarenessHandled = false;
+				if (LocksServerConfig.ENABLE_AWARENESS.get())
 				{
-					IItemHandler curioInv = curioRing.getCapability(ForgeCapabilities.ITEM_HANDLER).orElse(null);
-					if (curioInv == null) return;
-					for (int a = 0; a < curioInv.getSlots(); ++a)
+					for (Lockable candidate : intersect)
 					{
-						int id = LockingItem.getOrSetId(curioInv.getStackInSlot(a));
-						boolean matched = false;
-						for (Lockable l : intersect)
-						{
-							if (l.lock.id == id)
-							{
-								matched = true;
-								if (!world.isClientSide)
-								{
-									boolean wasLocked = l.lock.isLocked();
-									l.lock.setLocked(!wasLocked);
-									if (wasLocked)
-										LocksUtil.resolveLootTables(world, l, player);
-								}
-							}
-						}
-						if (matched)
+						if (!candidate.lock.isLocked()) continue;
+						if (EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.AWARENESS.get(), candidate.stack) <= 0) continue;
+						java.util.UUID owner = LockItem.getOwner(candidate.stack);
+						if (owner != null && owner.equals(player.getUUID()))
 						{
 							world.playSound(player, pos, LocksSoundEvents.LOCK_OPEN.get(), SoundSource.BLOCKS, 1f, 1f);
+							if (!world.isClientSide)
+								for (Lockable l : intersect)
+								{
+									java.util.UUID lOwner = LockItem.getOwner(l.stack);
+									if (lOwner != null && lOwner.equals(player.getUUID())
+										&& EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.AWARENESS.get(), l.stack) > 0)
+									{
+										boolean wasLocked = l.lock.isLocked();
+										l.lock.setLocked(!wasLocked);
+										if (wasLocked)
+											LocksUtil.resolveLootTables(world, l, player);
+									}
+								}
+							awarenessHandled = true;
 							break;
 						}
 					}
 				}
-				else
+				if (!awarenessHandled)
 				{
-					// No matching item anywhere: rattle (unless Silent enchantment)
-					lkb.swing(20);
-					if(!LocksServerConfig.ENABLE_SILENT.get() || EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.SILENT.get(), lkb.stack) == 0)
+					// Check curio slots for a key ring with matching key
+					ItemStack curioRing = CuriosHelper.findMatchingKeyRing(player, lkb.lock.id);
+					if (!curioRing.isEmpty())
 					{
-						world.playSound(player, pos, LocksSoundEvents.LOCK_RATTLE.get(), SoundSource.BLOCKS, 1f, 1f);
-						if(world.isClientSide && LocksClientConfig.DEAF_MODE.get())
-							player.displayClientMessage(LOCKED_MESSAGE, true);
+						IItemHandler curioInv = curioRing.getCapability(ForgeCapabilities.ITEM_HANDLER).orElse(null);
+						if (curioInv == null) return;
+						for (int a = 0; a < curioInv.getSlots(); ++a)
+						{
+							int id = LockingItem.getOrSetId(curioInv.getStackInSlot(a));
+							boolean matched = false;
+							for (Lockable l : intersect)
+							{
+								if (l.lock.id == id)
+								{
+									matched = true;
+									if (!world.isClientSide)
+									{
+										boolean wasLocked = l.lock.isLocked();
+										l.lock.setLocked(!wasLocked);
+										if (wasLocked)
+											LocksUtil.resolveLootTables(world, l, player);
+									}
+								}
+							}
+							if (matched)
+							{
+								world.playSound(player, pos, LocksSoundEvents.LOCK_OPEN.get(), SoundSource.BLOCKS, 1f, 1f);
+								break;
+							}
+						}
+					}
+					else
+					{
+						// No matching item anywhere: rattle (unless Silent enchantment)
+						lkb.swing(20);
+						if(!LocksServerConfig.ENABLE_SILENT.get() || EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.SILENT.get(), lkb.stack) == 0)
+						{
+							world.playSound(player, pos, LocksSoundEvents.LOCK_RATTLE.get(), SoundSource.BLOCKS, 1f, 1f);
+							if(world.isClientSide && LocksClientConfig.DEAF_MODE.get())
+								player.displayClientMessage(LOCKED_MESSAGE, true);
+						}
 					}
 				}
 			}

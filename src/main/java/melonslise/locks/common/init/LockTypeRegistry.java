@@ -29,8 +29,8 @@ import net.minecraftforge.registries.ForgeRegistries;
 
 public final class LockTypeRegistry
 {
-	public record LockStats(int length, int enchantmentValue, int resistance) {}
-	public record LockPickStats(float strength) {}
+	public record LockStats(int length, int enchantmentValue, int resistance, boolean fireResistant) {}
+	public record LockPickStats(float strength, boolean fireResistant) {}
 
 	private static final Gson GSON = new GsonBuilder().create();
 
@@ -195,7 +195,8 @@ public final class LockTypeRegistry
 		int length = clampWarn(id, "length", GsonHelper.getAsInt(json, "length"), 1, 20);
 		int enchantmentValue = clampWarn(id, "enchantment_value", GsonHelper.getAsInt(json, "enchantment_value"), 1, 50);
 		int resistance = clampWarn(id, "resistance", GsonHelper.getAsInt(json, "resistance"), 0, 1000);
-		LOCK_DEFAULTS.put(id, new LockStats(length, enchantmentValue, resistance));
+		boolean fireResistant = json.has("fire_resistant") && GsonHelper.getAsBoolean(json, "fire_resistant");
+		LOCK_DEFAULTS.put(id, new LockStats(length, enchantmentValue, resistance, fireResistant));
 	}
 
 	private static void parseLockPickDefinition(ResourceLocation id, JsonObject json)
@@ -206,7 +207,8 @@ public final class LockTypeRegistry
 			Locks.LOGGER.warn("Lockpick {} has out-of-range strength {} — clamping to [0.01, 10.0]", id, raw);
 			raw = Math.max(0.01f, Math.min(10f, raw));
 		}
-		LOCKPICK_DEFAULTS.put(id, new LockPickStats(raw));
+		boolean fireResistant = json.has("fire_resistant") && GsonHelper.getAsBoolean(json, "fire_resistant");
+		LOCKPICK_DEFAULTS.put(id, new LockPickStats(raw, fireResistant));
 	}
 
 	private static int clampWarn(ResourceLocation id, String field, int value, int min, int max)
@@ -237,7 +239,7 @@ public final class LockTypeRegistry
 		int l = length >= 0 ? length : base.length();
 		int e = enchant >= 0 ? enchant : base.enchantmentValue();
 		int r = resistance >= 0 ? resistance : base.resistance();
-		LOCK_STATS.put(id, new LockStats(l, e, r));
+		LOCK_STATS.put(id, new LockStats(l, e, r, base.fireResistant()));
 		Locks.LOGGER.debug("Applied TOML config override for lock {}", id);
 	}
 
@@ -249,7 +251,7 @@ public final class LockTypeRegistry
 			Locks.LOGGER.warn("TOML config references unknown lockpick: {}", id);
 			return;
 		}
-		LOCKPICK_STATS.put(id, new LockPickStats(strength));
+		LOCKPICK_STATS.put(id, new LockPickStats(strength, base.fireResistant()));
 		Locks.LOGGER.debug("Applied TOML config override for lockpick {}", id);
 	}
 
@@ -271,7 +273,7 @@ public final class LockTypeRegistry
 			int enchVal = json.has("enchantment_value") ? GsonHelper.getAsInt(json, "enchantment_value") : base.enchantmentValue();
 			int resist = json.has("resistance") ? GsonHelper.getAsInt(json, "resistance") : base.resistance();
 
-			LOCK_STATS.put(itemId, new LockStats(length, enchVal, resist));
+			LOCK_STATS.put(itemId, new LockStats(length, enchVal, resist, base.fireResistant()));
 			Locks.LOGGER.debug("Applied lock stat override for {}", itemId);
 		}
 	}
@@ -292,7 +294,7 @@ public final class LockTypeRegistry
 
 			float strength = json.has("strength") ? GsonHelper.getAsFloat(json, "strength") : base.strength();
 
-			LOCKPICK_STATS.put(itemId, new LockPickStats(strength));
+			LOCKPICK_STATS.put(itemId, new LockPickStats(strength, base.fireResistant()));
 			Locks.LOGGER.debug("Applied lockpick stat override for {}", itemId);
 		}
 	}
@@ -304,7 +306,7 @@ public final class LockTypeRegistry
 		if (stats == null)
 		{
 			Locks.LOGGER.error("No lock stats found for item: {}. Using fallback.", id);
-			return new LockStats(5, 10, 4);
+			return new LockStats(5, 10, 4, false);
 		}
 		return stats;
 	}
@@ -316,7 +318,7 @@ public final class LockTypeRegistry
 		if (stats == null)
 		{
 			Locks.LOGGER.error("No lockpick stats found for item: {}. Using fallback.", id);
-			return new LockPickStats(0.2f);
+			return new LockPickStats(0.2f, false);
 		}
 		return stats;
 	}

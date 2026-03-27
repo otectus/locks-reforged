@@ -5,8 +5,6 @@ import java.util.Collection;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.BiConsumer;
 
-import com.mojang.blaze3d.platform.GlStateManager;
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 
 import melonslise.locks.Locks;
@@ -152,37 +150,29 @@ public class LockPickingScreen extends AbstractContainerScreen<LockPickingContai
 
 		PoseStack mtx = guiGraphics.pose();
 
-		// Flush pending GuiGraphics buffers before raw Tesselator rendering
-		guiGraphics.flush();
-
-		RenderSystem.setShaderTexture(0, this.lockTex);
-
 		mtx.pushPose();
 		mtx.translate(cornerX, cornerY, 0f);
 		mtx.scale(2f, 2f, 2f);
-		FRONT_WALL_TEX.draw(mtx, 0f, 0f, 1f);
 
+		// Draw lock body using GuiGraphics.blit (compatible with rendering optimization mods)
+		FRONT_WALL_TEX.draw(guiGraphics, this.lockTex, 0f, 0f, 1f);
 		for(int a = 0; a < this.length; ++a)
 		{
-			COLUMN_TEX.draw(mtx, FRONT_WALL_TEX.width + a * (COLUMN_TEX.width + INNER_WALL_TEX.width), 0f, 1f);
+			COLUMN_TEX.draw(guiGraphics, this.lockTex, FRONT_WALL_TEX.width + a * (COLUMN_TEX.width + INNER_WALL_TEX.width), 0f, 1f);
 			if(a != this.length - 1)
-				INNER_WALL_TEX.draw(mtx, FRONT_WALL_TEX.width + COLUMN_TEX.width + a * (COLUMN_TEX.width + INNER_WALL_TEX.width), 0f, 1f);
+				INNER_WALL_TEX.draw(guiGraphics, this.lockTex, FRONT_WALL_TEX.width + COLUMN_TEX.width + a * (COLUMN_TEX.width + INNER_WALL_TEX.width), 0f, 1f);
 		}
-		BACK_WALL_TEX.draw(mtx, this.length * (COLUMN_TEX.width + INNER_WALL_TEX.width), 0f, 1f);
-		HANDLE_TEX.draw(mtx, BACK_WALL_TEX.width + this.length * (COLUMN_TEX.width + INNER_WALL_TEX.width), 2f, 1f);
-		RenderSystem.enableBlend();
-		RenderSystem.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
+		BACK_WALL_TEX.draw(guiGraphics, this.lockTex, this.length * (COLUMN_TEX.width + INNER_WALL_TEX.width), 0f, 1f);
+		HANDLE_TEX.draw(guiGraphics, this.lockTex, BACK_WALL_TEX.width + this.length * (COLUMN_TEX.width + INNER_WALL_TEX.width), 2f, 1f);
+
+		// Draw sprites — each gets its own texture to avoid mid-batch texture switches
 		for(Sprite sprite : this.sprites)
 		{
-			if(sprite == this.lockPick)
-				RenderSystem.setShaderTexture(0, this.pickTex); // FIXME fucking terrible
-			sprite.draw(mtx, pt);
+			ResourceLocation tex = (sprite == this.lockPick) ? this.pickTex : this.lockTex;
+			sprite.draw(guiGraphics, tex, pt);
 		}
-		mtx.popPose();
 
-		// Restore GL state to prevent blend leakage into other rendering
-		RenderSystem.defaultBlendFunc();
-		RenderSystem.disableBlend();
+		mtx.popPose();
 	}
 
 	@Override
@@ -276,6 +266,7 @@ public class LockPickingScreen extends AbstractContainerScreen<LockPickingContai
 
 	public void reset()
 	{
+		this.lockPick.speedX = 0;
 		//this.lockPick.reset();
 		for(int a = 0; a < this.pins.length; ++a)
 			if(this.pins[a])

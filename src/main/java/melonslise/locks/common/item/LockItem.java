@@ -2,12 +2,15 @@ package melonslise.locks.common.item;
 
 import java.util.List;
 
+import java.util.UUID;
+
 import melonslise.locks.Locks;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import melonslise.locks.common.capability.ILockableHandler;
 import melonslise.locks.common.capability.ISelection;
 import melonslise.locks.common.config.LocksServerConfig;
 import melonslise.locks.common.init.LocksCapabilities;
+import melonslise.locks.common.init.LocksEnchantments;
 import melonslise.locks.common.init.LocksSoundEvents;
 import melonslise.locks.common.init.LockTypeRegistry;
 import melonslise.locks.common.util.Cuboid6i;
@@ -20,6 +23,7 @@ import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.ChestType;
@@ -57,6 +61,20 @@ public class LockItem extends LockingItem
 	}
 
 	public static final String KEY_LENGTH = "Length";
+	public static final String KEY_OWNER = "Owner";
+
+	public static void setOwner(ItemStack stack, UUID uuid)
+	{
+		stack.getOrCreateTag().putUUID(KEY_OWNER, uuid);
+	}
+
+	public static UUID getOwner(ItemStack stack)
+	{
+		CompoundTag nbt = stack.getTag();
+		if (nbt != null && nbt.hasUUID(KEY_OWNER))
+			return nbt.getUUID(KEY_OWNER);
+		return null;
+	}
 
 	// WARNING: EXPECTS LOCKITEM STACK
 	public static byte getOrSetLength(ItemStack stack)
@@ -110,6 +128,9 @@ public class LockItem extends LockingItem
 			ItemStack stack = ctx.getItemInHand();
 			ItemStack lockStack = stack.copy();
 			lockStack.setCount(1);
+			if (LocksServerConfig.ENABLE_AWARENESS.get()
+				&& EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.AWARENESS.get(), lockStack) > 0)
+				setOwner(lockStack, player.getUUID());
 			ILockableHandler handler = world.getCapability(LocksCapabilities.LOCKABLE_HANDLER).orElse(null);
 			if (handler == null)
 				return InteractionResult.PASS;
@@ -147,6 +168,9 @@ public class LockItem extends LockingItem
 		ItemStack stack = ctx.getItemInHand();
 		ItemStack lockStack = stack.copy();
 		lockStack.setCount(1);
+		if (LocksServerConfig.ENABLE_AWARENESS.get()
+			&& EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.AWARENESS.get(), lockStack) > 0)
+			setOwner(lockStack, player.getUUID());
 		ILockableHandler handler = world.getCapability(LocksCapabilities.LOCKABLE_HANDLER).orElse(null);
 		if (handler == null)
 			return InteractionResult.PASS;
@@ -191,5 +215,7 @@ public class LockItem extends LockingItem
 		else
 			displayLength = LockTypeRegistry.getLockStats(this).length();
 		lines.add(Component.translatable(Locks.ID + ".tooltip.length", ItemStack.ATTRIBUTE_MODIFIER_FORMAT.format(displayLength)).withStyle(ChatFormatting.DARK_GREEN));
+		if (stack.hasTag() && stack.getTag().hasUUID(KEY_OWNER))
+			lines.add(Component.translatable(Locks.ID + ".tooltip.owned").withStyle(ChatFormatting.LIGHT_PURPLE));
 	}
 }

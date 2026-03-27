@@ -52,9 +52,25 @@
 - [ ] World generation (verify locked chests spawn in overworld)
 - [ ] Lock picking minigame UI
 - [ ] Key ring container UI
-- [ ] Enchantment application on locks (now 6 total: Shocking, Sturdy, Complexity, Silent, Auto-Pick, Reinforced)
+- [ ] Enchantment application on locks (now 7 total: Shocking, Sturdy, Complexity, Silent, Auto-Pick, Reinforced, Awareness)
 - [ ] Silent enchantment suppresses rattle sound
 - [ ] Auto-Pick enchantment bypasses minigame at correct rates (10%/20%/30%)
 - [ ] Reinforced enchantment scales explosion resistance
 - [ ] Silent/Shocking incompatibility enforced by enchanting table
 - [ ] Auto-Pick/Complexity incompatibility enforced by enchanting table
+- [ ] Awareness enchantment stores owner UUID on lock placement
+- [ ] Awareness lock auto-unlocks for owner (toggle behavior)
+- [ ] Awareness lock rattles for non-owner players
+- [ ] Overlapping Awareness locks from different owners work independently
+- [ ] Awareness config toggle disables the enchantment
+- [ ] Netherite lock has 14 pins in lock picking screen
+- [ ] Netherite lock pick has 0.95 strength in tooltip
+- [ ] Netherite lock pick rarely breaks (high strength)
+- [ ] Netherite Lockpick Unbreakable config prevents breaking entirely
+- [ ] Netherite lock and lock pick survive in lava (fire-resistant)
+- [ ] Netherite smithing recipes work at smithing table
+- [ ] Netherite items appear in creative tab after diamond
+- [ ] Netherite lock pick sold by level 5 toolsmith
+- [ ] Netherite lock sold by wandering trader (rare, enchanted)
+- [ ] Async loot precompute doesn't block world loading
+- [ ] Lockpicking GUI renders correctly with ImmediatelyFast installed
