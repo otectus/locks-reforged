@@ -64,7 +64,7 @@ public final class LocksConfig
 		ForgeConfigSpec.Builder cfg = new ForgeConfigSpec.Builder();
 
 		GENERATION_CHANCE = cfg
-			.comment("Chance to generate a random lock on every new chest during world generation. Set to 0 to disable")
+			.comment("Legacy setting — no longer used. All generated chests now receive a lock. Kept for config compatibility.")
 			.defineInRange("Generation Chance", 0.85d, 0d, 1d);
 		GENERATION_ENCHANT_CHANCE = cfg
 			.comment("Chance to randomly enchant a generated lock during world generation. Set to 0 to disable")
@@ -262,7 +262,7 @@ public final class LocksConfig
 	{
 		var entry = lootValueTierMap.floorEntry(lootValue);
 		if (entry == null)
-			return ItemStack.EMPTY;
+			return new ItemStack(ForgeRegistries.ITEMS.getValue(new ResourceLocation(Locks.ID, "wood_lock")));
 		ItemStack stack = new ItemStack(entry.getValue());
 		if (stack.isEmpty())
 			return ItemStack.EMPTY;

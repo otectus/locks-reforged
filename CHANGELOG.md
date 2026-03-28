@@ -1,5 +1,11 @@
 # Locks Reforged Changelog
 
+## 1.4.4
+
+### Guaranteed Lock Generation
+- All generated chests with loot tables now receive a lock. Chests that previously fell below the lowest loot value threshold (or failed the 85% generation chance roll) now get a wooden lock instead of no lock at all.
+- The `Generation Chance` config setting is no longer used — all generated chests are locked unconditionally. The setting is kept in the config file for backwards compatibility.
+
 ## 1.4.3
 
 ### Bug Fixes

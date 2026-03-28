@@ -2,6 +2,7 @@ package melonslise.locks.common.worldgen;
 
 import com.mojang.serialization.Codec;
 
+import melonslise.locks.Locks;
 import melonslise.locks.common.config.LocksConfig;
 import melonslise.locks.common.util.Cuboid6i;
 import melonslise.locks.common.util.ILockableProvider;
@@ -11,6 +12,7 @@ import melonslise.locks.common.util.LootValueCalculator;
 import melonslise.locks.common.util.Transform;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.WorldGenLevel;
@@ -23,6 +25,7 @@ import net.minecraft.world.level.levelgen.feature.Feature;
 import net.minecraft.world.level.levelgen.feature.FeaturePlaceContext;
 import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConfiguration;
 import net.minecraftforge.fml.ModList;
+import net.minecraftforge.registries.ForgeRegistries;
 
 public class LockChestsFeature extends Feature<NoneFeatureConfiguration>
 {
@@ -55,14 +58,11 @@ public class LockChestsFeature extends Feature<NoneFeatureConfiguration>
 		}
 
 		if (!usedLootScaling)
-		{
-			if (!LocksConfig.canGen(rng))
-				return false;
 			stack = LocksConfig.getRandomLock(rng);
-		}
 
+		// Safety net: guarantee at least a wooden lock on every generated chest
 		if (stack.isEmpty())
-			return false;
+			stack = new ItemStack(ForgeRegistries.ITEMS.getValue(new ResourceLocation(Locks.ID, "wood_lock")));
 
 		BlockState state = world.getBlockState(pos);
 		BlockPos pos1 = state.getValue(ChestBlock.TYPE) == ChestType.SINGLE || ModList.get().isLoaded("lootr") ? pos : pos.relative(ChestBlock.getConnectedDirection(state));
