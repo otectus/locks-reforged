@@ -1,5 +1,10 @@
 # Locks Reforged Changelog
 
+## 1.4.3
+
+### Bug Fixes
+- Fixed locked chest generation being restricted to overworld biomes. Structure chests can now generate locks in the nether, the end, and modded dimensions as well.
+
 ## 1.4.2
 
 ### Netherite Lock Pick
