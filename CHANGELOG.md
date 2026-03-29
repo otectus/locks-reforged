@@ -17,6 +17,11 @@
 - Fixed potential `ArrayIndexOutOfBoundsException` when loading lockables with corrupted or out-of-range transform data from NBT. Invalid indices now fall back to the default transform.
 - Fixed lock picking GUI springs not animating when pins move (regression from 1.4.2 rendering migration).
 
+### Textures
+- Changed the Netherite Lock Pick texture.
+- Fixed the unlocked Netherite Lock texture.
+- Darkened the Netherite lock mechanism texture.
+
 ### Cleanup
 - Removed dead code: unused `LocksCapabilities.registerCaps()`, `LocksConfig.canGen()`, `WrittenBookItem` import, and commented-out code blocks across `Lock`, `Cuboid6i`, `LockPickingContainer`, and `LocksClientUtil`.
 
