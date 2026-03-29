@@ -34,6 +34,8 @@ public class RemoveLockablePacket
 			@Override
 			public void run()
 			{
+				if(Minecraft.getInstance().level == null)
+					return;
 				Minecraft.getInstance().level.getCapability(LocksCapabilities.LOCKABLE_HANDLER).ifPresent(handler -> handler.remove(pkt.id));
 			}
 		});

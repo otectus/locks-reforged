@@ -245,11 +245,6 @@ public final class LocksConfig
 		}
 	}
 
-	public static boolean canGen(RandomSource rng)
-	{
-		return LocksUtil.chance(rng, GENERATION_CHANCE.get());
-	}
-
 	public static boolean canEnchant(RandomSource rng)
 	{
 		return LocksUtil.chance(rng, GENERATION_ENCHANT_CHANCE.get());

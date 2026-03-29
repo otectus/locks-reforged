@@ -15,7 +15,6 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.capabilities.CapabilityManager;
 import net.minecraftforge.common.capabilities.CapabilityToken;
-import net.minecraftforge.common.capabilities.RegisterCapabilitiesEvent;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
 
 public final class LocksCapabilities
@@ -27,13 +26,6 @@ public final class LocksCapabilities
 	public static final Capability<ISelection> SELECTION = CapabilityManager.get(new CapabilityToken<>(){});
 
 	private LocksCapabilities() {}
-
-	public static void registerCaps(RegisterCapabilitiesEvent event)
-	{
-		event.register(ILockableHandler.class);
-		event.register(ILockableStorage.class);
-		event.register(ISelection.class);
-	}
 
 	public static void attachToWorld(AttachCapabilitiesEvent<Level> e)
 	{

@@ -121,10 +121,11 @@ public class LockItem extends LockingItem
 		{
 			Level world = ctx.getLevel();
 			select.set(null);
-			// FIXME Go through the add checks here as well
-			world.playSound(player, pos, LocksSoundEvents.LOCK_CLOSE.get(), SoundSource.BLOCKS, 1f, 1f);
 			if (world.isClientSide)
+			{
+				world.playSound(player, pos, LocksSoundEvents.LOCK_CLOSE.get(), SoundSource.BLOCKS, 1f, 1f);
 				return InteractionResult.SUCCESS;
+			}
 			ItemStack stack = ctx.getItemInHand();
 			ItemStack lockStack = stack.copy();
 			lockStack.setCount(1);
@@ -136,6 +137,7 @@ public class LockItem extends LockingItem
 				return InteractionResult.PASS;
 			if (!handler.add(new Lockable(new Cuboid6i(pos1, pos), Lock.from(stack), Transform.fromDirection(ctx.getClickedFace(), player.getDirection().getOpposite()), lockStack, world)))
 				return InteractionResult.PASS;
+			world.playSound(null, pos, LocksSoundEvents.LOCK_CLOSE.get(), SoundSource.BLOCKS, 1f, 1f);
 			if (!player.isCreative())
 				stack.shrink(1);
 		}
@@ -147,9 +149,11 @@ public class LockItem extends LockingItem
 		Player player = ctx.getPlayer();
 		Level world = ctx.getLevel();
 		BlockPos pos = ctx.getClickedPos();
-		world.playSound(player, pos, LocksSoundEvents.LOCK_CLOSE.get(), SoundSource.BLOCKS, 1f, 1f);
 		if(world.isClientSide)
+		{
+			world.playSound(player, pos, LocksSoundEvents.LOCK_CLOSE.get(), SoundSource.BLOCKS, 1f, 1f);
 			return InteractionResult.SUCCESS;
+		}
 		BlockState state = world.getBlockState(pos);
 		BlockPos pos1 = pos;
 		if(state.hasProperty(BlockStateProperties.CHEST_TYPE) && state.getValue(BlockStateProperties.CHEST_TYPE) != ChestType.SINGLE)
@@ -176,6 +180,7 @@ public class LockItem extends LockingItem
 			return InteractionResult.PASS;
 		if (!handler.add(new Lockable(new Cuboid6i(pos, pos1), Lock.from(stack), Transform.fromDirection(ctx.getClickedFace(), player.getDirection().getOpposite()), lockStack, world)))
 			return InteractionResult.PASS;
+		world.playSound(null, pos, LocksSoundEvents.LOCK_CLOSE.get(), SoundSource.BLOCKS, 1f, 1f);
 		if (!player.isCreative())
 			stack.shrink(1);
 		return InteractionResult.SUCCESS;

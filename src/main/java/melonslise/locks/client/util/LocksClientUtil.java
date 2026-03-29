@@ -56,27 +56,6 @@ public final class LocksClientUtil
 		return l.cross(p.subtract(l1)).lengthSqr() / l.lengthSqr();
 	}
 
-	/*
-	public static Matrix4f getProjectionMatrix(float pt)
-	{
-		return Minecraft.getInstance().gameRenderer.getProjectionMatrix(getCamera(), pt, true);
-	}
-
-	public static Matrix4f getViewMatrix()
-	{
-		Camera cam = getCamera();
-		Vector3f x = cam.left;
-		Vector3f y = cam.getUpVector();
-		Vector3f z = cam.getLookVector();
-		return new Matrix4f(new float[] {
-			-x.x, -x.y, -x.z, 0f,
-			-y.x, -y.y, -y.z, 0f,
-			z.x, z.y, z.z, 0f,
-			0f, 0f, 0f, 1f
-		});
-	}
-	*/
-
 	// https://forums.minecraftforge.net/topic/88562-116solved-3d-to-2d-conversion/
 	// And big thanks to JTK222 Lukas!!!
 	public static Vector3f worldToScreen(Vec3 pos, float partialTicks)
@@ -112,19 +91,6 @@ public final class LocksClientUtil
 
 		return pos1;
 	}
-
-	/*
-	public static Vector2f worldToScreen(Vec3 pos, Matrix4f proj)
-	{
-		Vec3 o = getCamera().getPosition();
-		Vector4f pos1 = new Vector4f((float) (o.x - pos.x), (float) (o.y - pos.y), (float) (o.z - pos.z), 1f);
-		pos1.transform(getViewMatrix());
-		pos1.transform(proj);
-		pos1.perspectiveDivide();
-		Window w = Minecraft.getInstance().getWindow();
-		return new Vector2f((1f - pos1.x) * w.getGuiScaledWidth() / 2f, (1f - pos1.y) * w.getGuiScaledHeight() / 2f);
-	}
-	*/
 
 	public static void blitTexture(GuiGraphics guiGraphics, ResourceLocation texture, float x, float y, int u, int v, int width, int height, int texWidth, int texHeight, float alpha)
 	{

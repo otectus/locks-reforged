@@ -35,7 +35,10 @@ public class AddLockablePacket
 			@Override
 			public void run()
 			{
-				Minecraft.getInstance().level.getCapability(LocksCapabilities.LOCKABLE_HANDLER).ifPresent(handler -> handler.add(pkt.lockable));
+				if(Minecraft.getInstance().level == null)
+					return;
+				// Skip validation on client — server already validated volume and intersection
+				Minecraft.getInstance().level.getCapability(LocksCapabilities.LOCKABLE_HANDLER).ifPresent(handler -> handler.addDirect(pkt.lockable));
 			}
 		});
 		ctx.get().setPacketHandled(true);

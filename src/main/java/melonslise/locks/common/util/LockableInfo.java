@@ -22,7 +22,10 @@ public class LockableInfo
 
 	public static LockableInfo fromNbt(CompoundTag nbt)
 	{
-		return new LockableInfo(Cuboid6i.fromNbt(nbt.getCompound(Lockable.KEY_BB)), Lock.fromNbt(nbt.getCompound(Lockable.KEY_LOCK)), Transform.values()[(int) nbt.getByte(Lockable.KEY_TRANSFORM)], ItemStack.of(nbt.getCompound(Lockable.KEY_STACK)), nbt.getInt(Lockable.KEY_ID));
+		int trIdx = nbt.getByte(Lockable.KEY_TRANSFORM) & 0xFF;
+		Transform[] transforms = Transform.values();
+		Transform tr = trIdx < transforms.length ? transforms[trIdx] : transforms[0];
+		return new LockableInfo(Cuboid6i.fromNbt(nbt.getCompound(Lockable.KEY_BB)), Lock.fromNbt(nbt.getCompound(Lockable.KEY_LOCK)), tr, ItemStack.of(nbt.getCompound(Lockable.KEY_STACK)), nbt.getInt(Lockable.KEY_ID));
 	}
 
 	public static CompoundTag toNbt(LockableInfo lkb)

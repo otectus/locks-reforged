@@ -37,7 +37,11 @@ public class TryPinPacket
 			{
 				AbstractContainerMenu container = ctx.get().getSender().containerMenu;
 				if(container.getType() == LocksMenuTypes.LOCK_PICKING.get())
-					((LockPickingContainer) container).tryPin(pkt.pin);
+				{
+					LockPickingContainer lpc = (LockPickingContainer) container;
+					if(pkt.pin >= 0 && pkt.pin < lpc.lockable.lock.getLength())
+						lpc.tryPin(pkt.pin);
+				}
 			}
 		});
 		ctx.get().setPacketHandled(true);

@@ -70,7 +70,7 @@ public class LockChestsFeature extends Feature<NoneFeatureConfiguration>
 		lkb.bb.getContainedChunks((x, z) ->
 		{
 			((ILockableProvider) world.getChunk(x, z)).getLockables().add(lkb);
-			return true;
+			return false;
 		});
 		return true;
 	}

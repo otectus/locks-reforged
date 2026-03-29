@@ -1,5 +1,25 @@
 # Locks Reforged Changelog
 
+## 1.4.8
+
+### Security
+- Lock pin combinations are no longer sent to clients over the network. The server now only transmits the pin count; pin validation remains fully server-authoritative. Previously, the full combo was readable from packets, trivially bypassing the lock picking minigame.
+- Network version predicates now enforce strict version matching. Clients and servers with mismatched mod versions are cleanly rejected instead of silently connecting with incompatible packet formats.
+- Server-to-client pin attempt packets are now range-validated, rejecting out-of-bounds pin indices.
+
+### Bug Fixes
+- Fixed locks failing to render on multiplayer clients when the server's `Max Lockable Volume` config exceeded the default value. Client-side packet handling no longer re-runs volume/intersection validation that only the server should perform.
+- Fixed potential client crash (`NullPointerException`) when lock packets arrive during dimension transitions or disconnect, before the client level is initialized.
+- Fixed potential server crash (`NullPointerException`) when removing a lockable whose bounding box spans a chunk that has already been unloaded. Unloaded chunks are now skipped gracefully.
+- Fixed lock-close sound playing to nearby players even when lock placement fails server-side validation (e.g. overlapping an existing lock). Sound now plays only after successful placement.
+- Fixed the key crafting recipe consuming all key blanks in the grid but producing only one key. The recipe now accepts exactly one blank per craft.
+- Fixed worldgen lock placement only registering in the first chunk when a double chest spans a chunk boundary. All intersecting proto-chunks now receive the lockable.
+- Fixed potential `ArrayIndexOutOfBoundsException` when loading lockables with corrupted or out-of-range transform data from NBT. Invalid indices now fall back to the default transform.
+- Fixed lock picking GUI springs not animating when pins move (regression from 1.4.2 rendering migration).
+
+### Cleanup
+- Removed dead code: unused `LocksCapabilities.registerCaps()`, `LocksConfig.canGen()`, `WrittenBookItem` import, and commented-out code blocks across `Lock`, `Cuboid6i`, `LockPickingContainer`, and `LocksClientUtil`.
+
 ## 1.4.4
 
 ### Guaranteed Lock Generation

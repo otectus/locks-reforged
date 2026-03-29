@@ -93,23 +93,42 @@ public class LockableHandler implements ILockableHandler
 	}
 
 	@Override
+	public void addDirect(Lockable lkb)
+	{
+		this.lockables.put(lkb.id, lkb);
+		lkb.addObserver(this);
+		lkb.bb.getContainedChunks((x, z) ->
+		{
+			if(this.world.hasChunk(x, z))
+				this.world.getChunk(x, z).getCapability(LocksCapabilities.LOCKABLE_STORAGE).ifPresent(st -> st.add(lkb));
+			return false;
+		});
+		if(this.world.isClientSide)
+			lkb.swing(10);
+	}
+
+	@Override
 	public boolean remove(int id)
 	{
 		Lockable lkb = this.lockables.get(id);
 		if(lkb == this.lockables.defaultReturnValue())
 			return false;
-		List<LevelChunk> chs = lkb.bb.containedChunksTo((x, z) -> this.world.hasChunk(x, z) ? this.world.getChunk(x, z) : null, true);
+		List<LevelChunk> chs = lkb.bb.containedChunksTo((x, z) -> this.world.hasChunk(x, z) ? this.world.getChunk(x, z) : null, false);
 
 		// Remove from chunk
 		for(int a = 0; a < chs.size(); ++a)
-			chs.get(a).getCapability(LocksCapabilities.LOCKABLE_STORAGE).ifPresent(st -> st.remove(id));
+		{
+			LevelChunk ch = chs.get(a);
+			if(ch != null)
+				ch.getCapability(LocksCapabilities.LOCKABLE_STORAGE).ifPresent(st -> st.remove(id));
+		}
 		// Remove from world
 		this.lockables.remove(id);
 		lkb.deleteObserver(this);
 		// Do client/server extras
 		if(this.world.isClientSide)
 			return true;
-		LocksNetwork.MAIN.send(LocksPacketDistributors.TRACKING_AREA.with(() -> chs.stream()), new RemoveLockablePacket(id));
+		LocksNetwork.MAIN.send(LocksPacketDistributors.TRACKING_AREA.with(() -> chs.stream().filter(Objects::nonNull)), new RemoveLockablePacket(id));
 		return true;
 	}
 
