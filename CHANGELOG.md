@@ -1,5 +1,15 @@
 # Locks Reforged Changelog
 
+## 1.5.0
+
+### Generation Chance
+- Re-enabled the `Generation Chance` config setting. In 1.4.4 this was disabled and all generated chests received a lock unconditionally. It is now a functional setting again (default 1.0). Lowering it allows a percentage of generated chests to skip lock placement.
+
+### Bug Fixes
+- Fixed lock picking GUI showing garbled textures when a lockpick breaks. The broken pick halves were being rendered with the lock body texture atlas (48x80) instead of the lockpick texture atlas (160x16), causing completely wrong UV sampling.
+- Fixed the left broken pick piece's fade animation targeting the wrong sprite (right piece instead of left piece).
+- Fixed adjacent Lootr chests not all receiving locks. When two Lootr single chests were next to each other, Minecraft auto-connected them as a double chest (`LEFT`/`RIGHT`), and the `RIGHT` half was filtered out before lock placement could run.
+
 ## 1.4.8
 
 ### Security

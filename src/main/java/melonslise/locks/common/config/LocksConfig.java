@@ -64,8 +64,9 @@ public final class LocksConfig
 		ForgeConfigSpec.Builder cfg = new ForgeConfigSpec.Builder();
 
 		GENERATION_CHANCE = cfg
-			.comment("Legacy setting — no longer used. All generated chests now receive a lock. Kept for config compatibility.")
-			.defineInRange("Generation Chance", 0.85d, 0d, 1d);
+			.comment("Chance that a generated chest receives a lock. Set to 1.0 for every chest, lower to skip some.",
+				"Renamed from 'Generation Chance' in 1.5.0 to reset stale configs where the old key was marked as unused.")
+			.defineInRange("Lock Generation Chance", 1.0d, 0d, 1d);
 		GENERATION_ENCHANT_CHANCE = cfg
 			.comment("Chance to randomly enchant a generated lock during world generation. Set to 0 to disable")
 			.defineInRange("Generation Enchant Chance", 0.4d, 0d, 1d);

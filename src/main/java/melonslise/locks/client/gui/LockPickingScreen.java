@@ -168,7 +168,7 @@ public class LockPickingScreen extends AbstractContainerScreen<LockPickingContai
 		// Draw sprites — each gets its own texture to avoid mid-batch texture switches
 		for(Sprite sprite : this.sprites)
 		{
-			ResourceLocation tex = (sprite == this.lockPick) ? this.pickTex : this.lockTex;
+			ResourceLocation tex = (sprite == this.lockPick || sprite == this.leftPickPart || sprite == this.rightPickPart) ? this.pickTex : this.lockTex;
 			sprite.draw(guiGraphics, tex, pt);
 		}
 
@@ -276,7 +276,7 @@ public class LockPickingScreen extends AbstractContainerScreen<LockPickingContai
 			}
 		this.lockPick.alpha(0f);
 		this.rightPickPart.alpha(1f).execute(WaitAction.ticks(10), FadeAction.to(this.rightPickPart, 0f, 4));
-		this.leftPickPart.alpha(1f).execute(WaitAction.ticks(10), FadeAction.to(this.rightPickPart, 0f, 4).then(resetPickCb));
+		this.leftPickPart.alpha(1f).execute(WaitAction.ticks(10), FadeAction.to(this.leftPickPart, 0f, 4).then(resetPickCb));
 		this.frozen = true;
 	}
 
