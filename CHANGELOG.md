@@ -1,5 +1,27 @@
 # Locks Reforged Changelog
 
+## 1.5.2
+
+### Bug Fixes
+- Fixed keys, master keys, key rings, Awareness enchantment, and curio key rings being unable to re-lock unlocked lockables. The toggle logic only ran when at least one lockable was locked; unlocking all lockables at a position made re-locking impossible in all game modes.
+- Fixed `NullPointerException` crash in `StructureTemplateMixin` when the lockable handler capability is missing during structure copy or paste operations.
+- Fixed `Lock.fromBuf` creating an all-zero pin combo on the client instead of generating a proper dummy combo from the lock's ID seed.
+- Fixed `KeyRingInventory.extractItem` using `getMaxStackSize()` instead of `getCount()` as the extraction limit, violating the `IItemHandler` contract.
+- Fixed `Transform.fromDirectionAndFace` returning null for unmapped direction/face combinations, which could cause `NullPointerException` in lock state calculations. Now falls back to `NORTH_MID`.
+- Fixed `LockItem.isOpen()` calling `getOrCreateTag()` on read, which unnecessarily created empty NBT tags on items without existing data.
+
+### Loot-Scaled Lock Generation
+- Chests whose loot value falls below all configured tier thresholds no longer receive a lock when loot-scaled locks are enabled. Previously, these low-value chests always received a wood lock despite the config description stating otherwise.
+
+### New Config
+- Added **Loot Table Injection Patterns** server config option. Controls which loot tables receive lock pick and key loot injection. Default: `minecraft:chests/`. Add entries like `some_mod:chests/` to inject into modded dungeon chests.
+
+### Security
+- Added additional server-side validation to lock picking packets: the server now re-checks that the lock is still locked and the player still holds a valid pick before processing each pin attempt.
+
+### Misc
+- Invalid entries in the `Lockable Tags` config list now log a warning instead of being silently skipped.
+
 ## 1.5.0
 
 ### Generation Chance

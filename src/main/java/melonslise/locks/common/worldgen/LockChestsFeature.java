@@ -68,9 +68,12 @@ public class LockChestsFeature extends Feature<NoneFeatureConfiguration>
 		if (!usedLootScaling)
 			stack = LocksConfig.getRandomLock(rng);
 
-		// Safety net: guarantee at least a wooden lock on every generated chest
+		// When loot-scaled locks are enabled and loot value is below all thresholds, skip this chest
 		if (stack.isEmpty())
-			stack = new ItemStack(ForgeRegistries.ITEMS.getValue(new ResourceLocation(Locks.ID, "wood_lock")));
+		{
+			Locks.LOGGER.debug("LockChestsFeature: skipping {} — loot value below all tier thresholds", pos);
+			return false;
+		}
 
 		BlockState state = world.getBlockState(pos);
 		BlockPos pos1 = state.getValue(ChestBlock.TYPE) == ChestType.SINGLE || ModList.get().isLoaded("lootr") ? pos : pos.relative(ChestBlock.getConnectedDirection(state));

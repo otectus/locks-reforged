@@ -52,7 +52,8 @@ public class LockItem extends LockingItem
 
 	public static boolean isOpen(ItemStack stack)
 	{
-		return stack.getOrCreateTag().getBoolean(KEY_OPEN);
+		CompoundTag nbt = stack.getTag();
+		return nbt != null && nbt.getBoolean(KEY_OPEN);
 	}
 
 	public static void setOpen(ItemStack stack, boolean open)

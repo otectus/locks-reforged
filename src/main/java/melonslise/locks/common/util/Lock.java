@@ -67,8 +67,8 @@ public class Lock extends Observable
 		int id = buf.readInt();
 		int length = buf.readInt();
 		boolean locked = buf.readBoolean();
-		// Client receives only the length, not the actual combo
-		return new Lock(id, new byte[length], locked);
+		// Client receives only the length, not the actual combo — generate a dummy combo from the seed
+		return new Lock(id, length, locked);
 	}
 
 	public static void toBuf(FriendlyByteBuf buf, Lock lock)

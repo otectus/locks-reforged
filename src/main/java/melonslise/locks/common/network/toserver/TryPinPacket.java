@@ -39,7 +39,9 @@ public class TryPinPacket
 				if(container.getType() == LocksMenuTypes.LOCK_PICKING.get())
 				{
 					LockPickingContainer lpc = (LockPickingContainer) container;
-					if(pkt.pin >= 0 && pkt.pin < lpc.lockable.lock.getLength())
+					if(pkt.pin >= 0 && pkt.pin < lpc.lockable.lock.getLength()
+						&& lpc.lockable.lock.isLocked()
+						&& lpc.isValidPick(ctx.get().getSender().getItemInHand(lpc.hand)))
 						lpc.tryPin(pkt.pin);
 				}
 			}

@@ -252,13 +252,14 @@ public final class LocksConfig
 	}
 
 	/**
-	 * Returns a lock ItemStack based on the total loot value, or null if the value is below all thresholds.
+	 * Returns a lock ItemStack based on the total loot value, or {@link ItemStack#EMPTY} if the value
+	 * is below all thresholds (meaning no lock should be generated for this chest).
 	 */
 	public static ItemStack getLockForLootValue(double lootValue, RandomSource rng)
 	{
 		var entry = lootValueTierMap.floorEntry(lootValue);
 		if (entry == null)
-			return new ItemStack(ForgeRegistries.ITEMS.getValue(new ResourceLocation(Locks.ID, "wood_lock")));
+			return ItemStack.EMPTY;
 		ItemStack stack = new ItemStack(entry.getValue());
 		if (stack.isEmpty())
 			return ItemStack.EMPTY;
