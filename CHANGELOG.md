@@ -1,5 +1,10 @@
 # Locks Reforged Changelog
 
+## 1.5.3
+
+### Bug Fixes
+- Fixed inability to place locks on containers in Adventure gamemode. Vanilla's `ItemStack.useOn()` short-circuits when `mayBuild` is false, which prevented `LockItem.useOn()` from ever firing. Lock placement now falls back to the `RightClickBlock` event handler when sneak-clicking with a lock item in Adventure mode, matching how picking, relocking, and pickup already worked.
+
 ## 1.5.2
 
 ### Bug Fixes

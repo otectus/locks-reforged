@@ -45,6 +45,7 @@ import net.minecraft.world.entity.npc.VillagerTrades;
 import net.minecraft.world.entity.npc.VillagerTrades.ItemListing;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.storage.loot.LootPool;
@@ -221,7 +222,26 @@ public final class LocksForgeEvents
 			if(lkb.bb.intersects(pos))
 				intersect.add(lkb);
 		if(intersect.isEmpty())
+		{
+			// Adventure mode fallback: vanilla ItemStack.useOn() short-circuits when
+			// !mayBuild, so LockItem.useOn() never fires. Invoke it directly on the
+			// sneak-place gesture so lock placement works without changing gamemode.
+			ItemStack held = e.getItemStack();
+			if(e.getHand() == InteractionHand.MAIN_HAND
+				&& !player.getAbilities().mayBuild
+				&& player.isSecondaryUseActive()
+				&& held.getItem() instanceof LockItem lockItem)
+			{
+				UseOnContext ctx = new UseOnContext(player, e.getHand(), e.getHitVec());
+				InteractionResult result = lockItem.useOn(ctx);
+				if(result != InteractionResult.PASS)
+				{
+					e.setCanceled(true);
+					e.setCancellationResult(result);
+				}
+			}
 			return;
+		}
 		// PlayerInteractEvent.RightClickBlock fires once per hand. We process only MAIN_HAND
 		// and deny block interaction on OFFHAND to prevent double-firing. This is correct even
 		// with shields or other offhand items — Forge fires the main-hand event independently.
