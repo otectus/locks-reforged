@@ -18,5 +18,7 @@ public interface ILockableHandler extends INBTSerializable<IntTag>, Observer
 
 	boolean add(Lockable lkb);
 
+	void addDirect(Lockable lkb);
+
 	boolean remove(int id);
 }

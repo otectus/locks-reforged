@@ -5,7 +5,6 @@ import melonslise.locks.common.init.LocksRecipeSerializers;
 import melonslise.locks.common.item.LockingItem;
 import net.minecraft.world.inventory.CraftingContainer;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.WrittenBookItem;
 import net.minecraft.world.item.crafting.CraftingBookCategory;
 import net.minecraft.world.item.crafting.CustomRecipe;
 import net.minecraft.world.item.crafting.RecipeSerializer;
@@ -48,7 +47,7 @@ public class KeyRecipe extends CustomRecipe
 			else
 				return false;
 		}
-		return hasLocking && blanks >= 1;
+		return hasLocking && blanks == 1;
 	}
 
 	@Override
@@ -74,7 +73,7 @@ public class KeyRecipe extends CustomRecipe
 				return ItemStack.EMPTY;
 		}
 
-		if(!locking.isEmpty() && blanks >= 1)
+		if(!locking.isEmpty() && blanks == 1)
 			return LockingItem.copyId(locking, new ItemStack(LocksItems.KEY.get()));
 		return ItemStack.EMPTY;
 	}

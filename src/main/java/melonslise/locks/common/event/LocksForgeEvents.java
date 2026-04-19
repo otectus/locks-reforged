@@ -45,6 +45,7 @@ import net.minecraft.world.entity.npc.VillagerTrades;
 import net.minecraft.world.entity.npc.VillagerTrades.ItemListing;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.storage.loot.LootPool;
@@ -124,7 +125,7 @@ public final class LocksForgeEvents
 	public static void onLootTableLoad(LootTableLoadEvent e)
 	{
 		ResourceLocation name = e.getName();
-		if(!name.getNamespace().equals("minecraft") || !name.getPath().startsWith("chests/"))
+		if(!LocksServerConfig.matchesLootTablePattern(name))
 			return;
 		ResourceLocation injectLoc = new ResourceLocation(Locks.ID, "loot_tables/inject/" + name.getPath() + ".json");
 		net.minecraft.server.MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
@@ -221,7 +222,26 @@ public final class LocksForgeEvents
 			if(lkb.bb.intersects(pos))
 				intersect.add(lkb);
 		if(intersect.isEmpty())
+		{
+			// Adventure mode fallback: vanilla ItemStack.useOn() short-circuits when
+			// !mayBuild, so LockItem.useOn() never fires. Invoke it directly on the
+			// sneak-place gesture so lock placement works without changing gamemode.
+			ItemStack held = e.getItemStack();
+			if(e.getHand() == InteractionHand.MAIN_HAND
+				&& !player.getAbilities().mayBuild
+				&& player.isSecondaryUseActive()
+				&& held.getItem() instanceof LockItem lockItem)
+			{
+				UseOnContext ctx = new UseOnContext(player, e.getHand(), e.getHitVec());
+				InteractionResult result = lockItem.useOn(ctx);
+				if(result != InteractionResult.PASS)
+				{
+					e.setCanceled(true);
+					e.setCancellationResult(result);
+				}
+			}
 			return;
+		}
 		// PlayerInteractEvent.RightClickBlock fires once per hand. We process only MAIN_HAND
 		// and deny block interaction on OFFHAND to prevent double-firing. This is correct even
 		// with shields or other offhand items — Forge fires the main-hand event independently.
@@ -405,6 +425,140 @@ public final class LocksForgeEvents
 			e.setCancellationResult(InteractionResult.SUCCESS);
 			e.setCanceled(true);
 			return;
+		}
+		else
+		{
+			// All lockables at this position are unlocked — handle re-locking
+			boolean relocked = false;
+
+			if(stack.getItem() == LocksItems.MASTER_KEY.get())
+			{
+				e.setUseBlock(Event.Result.DENY);
+				e.setUseItem(Event.Result.DENY);
+				world.playSound(player, pos, LocksSoundEvents.LOCK_CLOSE.get(), SoundSource.BLOCKS, 1f, 1f);
+				if(!world.isClientSide)
+					for(Lockable l : intersect)
+						l.lock.setLocked(true);
+				relocked = true;
+			}
+			else if(LocksTagHelper.isKey(stack))
+			{
+				int id = LockingItem.getOrSetId(stack);
+				boolean hasMatch = false;
+				for(Lockable l : intersect)
+					if(l.lock.id == id) { hasMatch = true; break; }
+				if(hasMatch)
+				{
+					e.setUseBlock(Event.Result.DENY);
+					e.setUseItem(Event.Result.DENY);
+					world.playSound(player, pos, LocksSoundEvents.LOCK_CLOSE.get(), SoundSource.BLOCKS, 1f, 1f);
+					if(!world.isClientSide)
+						for(Lockable l : intersect)
+							if(l.lock.id == id)
+								l.lock.setLocked(true);
+					relocked = true;
+				}
+			}
+			else if(stack.getItem() == LocksItems.KEY_RING.get())
+			{
+				IItemHandler inv = stack.getCapability(ForgeCapabilities.ITEM_HANDLER).orElse(null);
+				if(inv != null)
+				{
+					for(int a = 0; a < inv.getSlots(); ++a)
+					{
+						int id = LockingItem.getOrSetId(inv.getStackInSlot(a));
+						boolean matched = false;
+						for(Lockable l : intersect)
+						{
+							if(l.lock.id == id)
+							{
+								matched = true;
+								if(!world.isClientSide)
+									l.lock.setLocked(true);
+							}
+						}
+						if(matched)
+						{
+							e.setUseBlock(Event.Result.DENY);
+							e.setUseItem(Event.Result.DENY);
+							world.playSound(player, pos, LocksSoundEvents.LOCK_CLOSE.get(), SoundSource.BLOCKS, 1f, 1f);
+							relocked = true;
+							break;
+						}
+					}
+				}
+			}
+
+			if(!relocked && LocksServerConfig.ENABLE_AWARENESS.get())
+			{
+				for(Lockable candidate : intersect)
+				{
+					if(EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.AWARENESS.get(), candidate.stack) <= 0) continue;
+					java.util.UUID owner = LockItem.getOwner(candidate.stack);
+					if(owner != null && owner.equals(player.getUUID()))
+					{
+						e.setUseBlock(Event.Result.DENY);
+						e.setUseItem(Event.Result.DENY);
+						world.playSound(player, pos, LocksSoundEvents.LOCK_CLOSE.get(), SoundSource.BLOCKS, 1f, 1f);
+						if(!world.isClientSide)
+							for(Lockable l : intersect)
+							{
+								java.util.UUID lOwner = LockItem.getOwner(l.stack);
+								if(lOwner != null && lOwner.equals(player.getUUID())
+									&& EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.AWARENESS.get(), l.stack) > 0)
+									l.lock.setLocked(true);
+							}
+						relocked = true;
+						break;
+					}
+				}
+			}
+
+			if(!relocked)
+			{
+				for(Lockable candidate : intersect)
+				{
+					ItemStack curioRing = CuriosHelper.findMatchingKeyRing(player, candidate.lock.id);
+					if(!curioRing.isEmpty())
+					{
+						IItemHandler curioInv = curioRing.getCapability(ForgeCapabilities.ITEM_HANDLER).orElse(null);
+						if(curioInv != null)
+						{
+							for(int a = 0; a < curioInv.getSlots(); ++a)
+							{
+								int id = LockingItem.getOrSetId(curioInv.getStackInSlot(a));
+								boolean matched = false;
+								for(Lockable l : intersect)
+								{
+									if(l.lock.id == id)
+									{
+										matched = true;
+										if(!world.isClientSide)
+											l.lock.setLocked(true);
+									}
+								}
+								if(matched)
+								{
+									e.setUseBlock(Event.Result.DENY);
+									e.setUseItem(Event.Result.DENY);
+									world.playSound(player, pos, LocksSoundEvents.LOCK_CLOSE.get(), SoundSource.BLOCKS, 1f, 1f);
+									relocked = true;
+									break;
+								}
+							}
+						}
+						if(relocked) break;
+					}
+				}
+			}
+
+			if(relocked)
+			{
+				player.swing(InteractionHand.MAIN_HAND);
+				e.setCancellationResult(InteractionResult.SUCCESS);
+				e.setCanceled(true);
+				return;
+			}
 		}
 		if(LocksServerConfig.ALLOW_REMOVING_LOCKS.get() && player.isShiftKeyDown() && stack.isEmpty())
 		{

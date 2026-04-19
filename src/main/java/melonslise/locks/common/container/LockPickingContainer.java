@@ -191,15 +191,6 @@ public class LockPickingContainer extends AbstractContainerMenu
 		return true;
 	}
 
-	/*
-	protected float getPinDifficulty(int index)
-	{
-		// Basically takes the the distance (how many pins away) between the clicked pin and the next correct pin, then divides that by the amount of pins left to click and then plugs it into a simple linear function -ax+a where a = 0.4
-		// This way we get a higher chance to break the further away we were from the correct pin
-		return -0.5f * ((float) (index - this.currIndex) / (this.lockable.lock.getLength() - this.currIndex - 1)) + 0.5f;
-	}
-	*/
-
 	protected float getBreakChanceMultiplier(int pin)
 	{
 		return Math.abs(this.lockable.lock.getPin(this.currIndex) - pin) == 1 ? 0.33f : 1f;

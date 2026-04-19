@@ -60,7 +60,7 @@ Locked blocks are protected from:
 - Breaking (configurable)
 
 ### Loot-Scaled Lock Generation
-Lock tier is determined by the **value of a chest's loot table contents**. Village chests get wood or copper locks, while end city chests get gold or diamond locks. Chests with low-value loot get no lock at all.
+Lock tier is determined by the **value of a chest's loot table contents**. Village chests get wood or copper locks, while end city chests get gold or diamond locks. Every generated chest gets at least a wooden lock — no chest is left unprotected.
 
 - **Multi-sample averaging** — each loot table is sampled 32 times and averaged for consistent tier assignments across server restarts.
 - **Sub-linear stack count** — item value scales with the square root of stack size, so 64 cobblestone doesn't outrank a diamond sword.
@@ -172,7 +172,7 @@ Lock mechanisms (Wood, Copper, Iron, Steel) are basic crafting components — th
 All settings are customizable via config files. Note that `locks-server.toml` is **per-world** and lives in a different location than the other two:
 
 **`config/locks-common.toml`** — World generation and item stats
-- **Generation Chance** — How often locks appear on generated chests (default: 85%, only used when loot-scaled locks is disabled)
+- **Generation Chance** — Legacy setting, no longer used. All generated chests now receive a lock unconditionally
 - **Enchant Chance** — How often generated locks are enchanted (default: 40%)
 - **Generated Locks / Weights** — Which lock tiers appear in worldgen and their relative rarity
 - **Loot-Scaled Locks** — Lock tier based on chest loot value (enabled by default). Configurable item values, rarity multipliers, enchantment bonuses, per-tier value thresholds, sample count, and per-item value overrides

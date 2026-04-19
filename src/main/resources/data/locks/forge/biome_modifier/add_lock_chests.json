@@ -1,6 +1,8 @@
 {
 	"type": "forge:add_features",
-	"biomes": "#minecraft:is_overworld",
+	"biomes": {
+		"type": "forge:any"
+	},
 	"features": "locks:lock_chests",
 	"step": "top_layer_modification"
 }

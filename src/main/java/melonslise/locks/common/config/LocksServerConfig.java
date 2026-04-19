@@ -6,6 +6,7 @@ import java.util.regex.Pattern;
 
 import com.google.common.collect.Lists;
 
+import melonslise.locks.Locks;
 import melonslise.locks.common.init.LocksBlockTags;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
@@ -45,8 +46,11 @@ public class LocksServerConfig
 
 	public static final ForgeConfigSpec.BooleanValue NETHERITE_PICK_UNBREAKABLE;
 
+	public static final ForgeConfigSpec.ConfigValue<List<? extends String>> LOOT_TABLE_PATTERNS;
+
 	public static Pattern[] lockableBlocks;
 	public static List<TagKey<Block>> lockableTags;
+	public static String[][] lootTablePatterns;
 
 	static
 	{
@@ -111,6 +115,12 @@ public class LocksServerConfig
 			.comment("When enabled, netherite lock picks never lose durability or break during lock picking")
 			.define("Netherite Lockpick Unbreakable", false);
 
+		LOOT_TABLE_PATTERNS = cfg
+			.comment("Loot tables matching these patterns will receive lock pick / key loot injection.",
+				"Each entry is 'namespace:path_prefix' (e.g. 'minecraft:chests/' matches all vanilla chest loot tables).",
+				"Add entries for modded namespaces to inject lock picks into modded dungeon chests.")
+			.defineList("Loot Table Injection Patterns", Lists.newArrayList("minecraft:chests/"), e -> e instanceof String);
+
 		SPEC = cfg.build();
 	}
 
@@ -126,12 +136,23 @@ public class LocksServerConfig
 		{
 			ResourceLocation loc = ResourceLocation.tryParse(s);
 			if(loc == null)
+			{
+				Locks.LOGGER.warn("Invalid lockable tag entry '{}' — not a valid resource location, skipping", s);
 				continue;
+			}
 			TagKey<Block> tag = TagKey.create(Registries.BLOCK, loc);
 			if(!tags.contains(tag))
 				tags.add(tag);
 		}
 		lockableTags = tags;
+
+		lootTablePatterns = LOOT_TABLE_PATTERNS.get().stream()
+			.map(s -> {
+				int colon = s.indexOf(':');
+				if(colon < 0)
+					return new String[] { "", s };
+				return new String[] { s.substring(0, colon), s.substring(colon + 1) };
+			}).toArray(String[][]::new);
 	}
 
 	public static boolean isEnchantmentEnabled(Enchantment enchantment)
@@ -144,6 +165,16 @@ public class LocksServerConfig
 		if (enchantment == LocksEnchantments.REINFORCED.get()) return ENABLE_REINFORCED.get();
 		if (enchantment == LocksEnchantments.AWARENESS.get()) return ENABLE_AWARENESS.get();
 		return true;
+	}
+
+	public static boolean matchesLootTablePattern(ResourceLocation name)
+	{
+		if(lootTablePatterns == null)
+			return false;
+		for(String[] pattern : lootTablePatterns)
+			if(name.getNamespace().equals(pattern[0]) && name.getPath().startsWith(pattern[1]))
+				return true;
+		return false;
 	}
 
 	public static boolean canLock(Level world, BlockPos pos)

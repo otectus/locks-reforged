@@ -130,7 +130,7 @@ public class KeyRingInventory implements IItemHandlerModifiable
 		ItemStack existing = this.getStackInSlot(slot);
 		if (existing.isEmpty())
 			return ItemStack.EMPTY;
-		int toExtract = Math.min(amount, existing.getMaxStackSize());
+		int toExtract = Math.min(amount, existing.getCount());
 		if (existing.getCount() <= toExtract)
 		{
 			if (!simulate)

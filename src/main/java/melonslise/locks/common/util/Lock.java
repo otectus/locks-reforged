@@ -23,7 +23,6 @@ public class Lock extends Observable
 		this.id = id;
 		this.rng = new Random(id);
 		this.combo = this.shuffle(length);
-		// this.lookup = this.inverse(this.combo);
 		this.locked = locked;
 	}
 
@@ -66,15 +65,17 @@ public class Lock extends Observable
 	public static Lock fromBuf(FriendlyByteBuf buf)
 	{
 		int id = buf.readInt();
-		byte[] combo = buf.readByteArray();
+		int length = buf.readInt();
 		boolean locked = buf.readBoolean();
-		return new Lock(id, combo, locked);
+		// Client receives only the length, not the actual combo — generate a dummy combo from the seed
+		return new Lock(id, length, locked);
 	}
 
 	public static void toBuf(FriendlyByteBuf buf, Lock lock)
 	{
 		buf.writeInt(lock.id);
-		buf.writeByteArray(lock.combo);
+		// Only send the combo length to the client — the pin order is server-authoritative
+		buf.writeInt(lock.combo.length);
 		buf.writeBoolean(lock.isLocked());
 	}
 
@@ -86,16 +87,6 @@ public class Lock extends Observable
 		LocksUtil.shuffle(combo, this.rng);
 		return combo;
 	}
-
-	/*
-	public byte[] inverse(byte[] combination)
-	{
-		byte[] lookup = new byte[combination.length];
-		for(byte a = 0; a < combination.length; ++a)
-			lookup[combination[a]] = a;
-		return lookup;
-	}
-	*/
 
 	public int getLength()
 	{

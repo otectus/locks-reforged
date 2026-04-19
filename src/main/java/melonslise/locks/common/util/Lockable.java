@@ -100,7 +100,10 @@ public class Lockable extends Observable implements Observer
 
 	public static Lockable fromNbt(CompoundTag nbt)
 	{
-		return new Lockable(Cuboid6i.fromNbt(nbt.getCompound(KEY_BB)), Lock.fromNbt(nbt.getCompound(KEY_LOCK)), Transform.values()[(int) nbt.getByte(KEY_TRANSFORM)], ItemStack.of(nbt.getCompound(KEY_STACK)), nbt.getInt(KEY_ID));
+		int trIdx = nbt.getByte(KEY_TRANSFORM) & 0xFF;
+		Transform[] transforms = Transform.values();
+		Transform tr = trIdx < transforms.length ? transforms[trIdx] : transforms[0];
+		return new Lockable(Cuboid6i.fromNbt(nbt.getCompound(KEY_BB)), Lock.fromNbt(nbt.getCompound(KEY_LOCK)), tr, ItemStack.of(nbt.getCompound(KEY_STACK)), nbt.getInt(KEY_ID));
 	}
 
 	public static CompoundTag toNbt(Lockable lkb)

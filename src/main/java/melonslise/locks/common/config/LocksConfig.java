@@ -64,8 +64,9 @@ public final class LocksConfig
 		ForgeConfigSpec.Builder cfg = new ForgeConfigSpec.Builder();
 
 		GENERATION_CHANCE = cfg
-			.comment("Chance to generate a random lock on every new chest during world generation. Set to 0 to disable")
-			.defineInRange("Generation Chance", 0.85d, 0d, 1d);
+			.comment("Chance that a generated chest receives a lock. Set to 1.0 for every chest, lower to skip some.",
+				"Renamed from 'Generation Chance' in 1.5.0 to reset stale configs where the old key was marked as unused.")
+			.defineInRange("Lock Generation Chance", 1.0d, 0d, 1d);
 		GENERATION_ENCHANT_CHANCE = cfg
 			.comment("Chance to randomly enchant a generated lock during world generation. Set to 0 to disable")
 			.defineInRange("Generation Enchant Chance", 0.4d, 0d, 1d);
@@ -245,18 +246,14 @@ public final class LocksConfig
 		}
 	}
 
-	public static boolean canGen(RandomSource rng)
-	{
-		return LocksUtil.chance(rng, GENERATION_CHANCE.get());
-	}
-
 	public static boolean canEnchant(RandomSource rng)
 	{
 		return LocksUtil.chance(rng, GENERATION_ENCHANT_CHANCE.get());
 	}
 
 	/**
-	 * Returns a lock ItemStack based on the total loot value, or null if the value is below all thresholds.
+	 * Returns a lock ItemStack based on the total loot value, or {@link ItemStack#EMPTY} if the value
+	 * is below all thresholds (meaning no lock should be generated for this chest).
 	 */
 	public static ItemStack getLockForLootValue(double lootValue, RandomSource rng)
 	{

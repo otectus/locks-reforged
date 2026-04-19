@@ -51,6 +51,8 @@ public class StructureTemplateMixin
 		{
 			this.lockableInfos.clear();
 			ILockableHandler handler = world.getCapability(LocksCapabilities.LOCKABLE_HANDLER).orElse(null);
+			if(handler == null)
+				return;
 			Cuboid6i bb = new Cuboid6i(start, start.offset(size.getX() - 1, size.getY() - 1, size.getZ() - 1));
 			handler.getLoaded().values().stream()
 				.filter(lkb -> lkb.bb.intersects(bb))
@@ -77,6 +79,8 @@ public class StructureTemplateMixin
 			return;
 		}
 		ILockableHandler handler = level.getCapability(LocksCapabilities.LOCKABLE_HANDLER).orElse(null);
+		if(handler == null)
+			return;
 		for(LockableInfo lkb : this.lockableInfos)
 		{
 			BlockPos pos1 = LocksUtil.transform(lkb.bb.x1, lkb.bb.y1, lkb.bb.z1, settings);

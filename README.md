@@ -56,7 +56,7 @@ An interactive lock picking mechanic with a pin-matching system. Each lock has a
 Each enchantment can be individually enabled or disabled in the server config.
 
 ### World Generation
-Locked chests spawn naturally in structures. By default, lock tier is determined by **loot value** — chests with better loot get stronger locks. The system samples each loot table multiple times and averages the results for consistent tier assignments, uses sub-linear stack count scaling so bulk common items don't inflate value, and supports per-item value overrides for materials like diamonds and netherite that are valuable but have common rarity. Can be switched to random weighted selection in the common config.
+All generated chests with loot tables spawn with a lock. Lock tier is determined by **loot value** — chests with better loot get stronger locks, and chests below all tier thresholds get a wooden lock as a minimum. The system samples each loot table multiple times and averages the results for consistent tier assignments, uses sub-linear stack count scaling so bulk common items don't inflate value, and supports per-item value overrides for materials like diamonds and netherite that are valuable but have common rarity. Can be switched to random weighted selection in the common config.
 
 ### Villager & Wandering Trader Integration
 Toolsmith villagers sell lock picks and lock mechanisms at various profession levels. Wandering traders offer rare lock picks and enchanted locks.
@@ -156,7 +156,7 @@ Only fields present in the override are changed; omitted fields keep their defau
 ## Configuration
 
 ### Common Config (`locks-common.toml`)
-- **Generation Chance** -- Probability of locks spawning on generated chests (default: 85%, only used when loot-scaled locks is disabled)
+- **Generation Chance** -- Legacy setting, no longer used. All generated chests now receive a lock unconditionally
 - **Enchant Chance** -- Probability of generated locks being enchanted (default: 40%)
 - **Lock Types & Weights** -- Which locks generate and their relative rarity
 - **Randomize Loaded Locks** -- Whether to randomize lock combinations on chunk load

@@ -13,7 +13,8 @@ import net.minecraftforge.network.simple.SimpleChannel;
 
 public final class LocksNetwork
 {
-	public static final SimpleChannel MAIN = NetworkRegistry.newSimpleChannel(new ResourceLocation(Locks.ID, "main"), () -> "locks", a -> true, a -> true);
+	private static final String PROTOCOL_VERSION = "2";
+	public static final SimpleChannel MAIN = NetworkRegistry.newSimpleChannel(new ResourceLocation(Locks.ID, "main"), () -> PROTOCOL_VERSION, PROTOCOL_VERSION::equals, PROTOCOL_VERSION::equals);
 
 	private LocksNetwork() {}
 
