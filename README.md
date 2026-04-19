@@ -19,7 +19,7 @@ This port preserves the original mod's license: **Attribution-NonCommercial 3.0 
 
 The original Locks mod was built for Minecraft 1.16.5 (Forge 36.x). This port updates it to Minecraft 1.20.1 (Forge 47.x) while preserving all original gameplay mechanics, item IDs, config keys, and network protocol.
 
-**Port Version:** 4.0.0 | **Minecraft:** 1.20.1 | **Forge:** 47.2.0+ | **Java:** 17
+**Version:** 1.5.4 | **Minecraft:** 1.20.1 | **Forge:** 47.2.0+ | **Java:** 17
 
 ## Features
 
@@ -185,7 +185,7 @@ cd "Locks Reforged"
 # Build the mod JAR
 JAVA_HOME="/path/to/jdk-17" ./gradlew build
 
-# Output: build/libs/locks-4.0.0.jar
+# Output: build/libs/locks_reforged-1.5.4.jar
 
 # Run the development client
 JAVA_HOME="/path/to/jdk-17" ./gradlew runClient
@@ -194,7 +194,7 @@ JAVA_HOME="/path/to/jdk-17" ./gradlew runClient
 ## Installation
 
 1. Install [Minecraft Forge 1.20.1](https://files.minecraftforge.net/net/minecraftforge/forge/index_1.20.1.html) (47.2.0 or later)
-2. Download `locks-4.0.0.jar` from the releases
+2. Download `locks_reforged-1.5.4.jar` from the releases
 3. Place the JAR in your `.minecraft/mods/` folder
 4. Launch Minecraft with the Forge profile
 

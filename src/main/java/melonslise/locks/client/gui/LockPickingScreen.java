@@ -198,8 +198,14 @@ public class LockPickingScreen extends AbstractContainerScreen<LockPickingContai
 	protected void updatePickParts()
 	{
 		this.rightPickPart.posY = this.lockPick.posY;
-		this.rightPickPart.tex.width = 10 + (int) this.lockPick.posX + this.lockPick.tex.width;
-		this.rightPickPart.tex.startX = this.rightPickPart.tex.canvasWidth - this.rightPickPart.tex.width;
+		// Clamp tex.width to canvas so long locks (posX > -10) don't overflow
+		// into negative startX and smear the full pick texture (ghost bug).
+		int rawRightWidth = 10 + (int) this.lockPick.posX + this.lockPick.tex.width;
+		int canvasWidth = this.rightPickPart.tex.canvasWidth;
+		int rightWidth = Mth.clamp(rawRightWidth, 0, canvasWidth);
+		this.rightPickPart.tex.width = rightWidth;
+		this.rightPickPart.tex.startX = canvasWidth - rightWidth;
+		this.rightPickPart.posX = -10 + Math.max(0, rawRightWidth - canvasWidth);
 
 		this.leftPickPart.posY = this.lockPick.posY;
 		this.leftPickPart.tex.width = this.rightPickPart.tex.startX;

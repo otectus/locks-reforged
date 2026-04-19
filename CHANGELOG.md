@@ -1,5 +1,10 @@
 # Locks Reforged Changelog
 
+## 1.5.4
+
+### Bug Fixes
+- Fixed a ghost lockpick briefly appearing at the insertion depth when a pick broke at the far end of a long lock (netherite and other 13+ pin locks). `LockPickingScreen.updatePickParts()` did not clamp the right fragment's texture width, so on long locks the UV overflowed the pick atlas and the edge-clamped sample rendered as a full pick silhouette behind the breaking pieces. The right fragment now clips to the atlas and follows the pick's actual insertion position.
+
 ## 1.5.3
 
 ### Bug Fixes
