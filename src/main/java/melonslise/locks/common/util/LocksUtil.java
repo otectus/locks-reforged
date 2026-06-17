@@ -6,11 +6,17 @@ import java.util.stream.Stream;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.minecraft.util.RandomSource;
 
+import melonslise.locks.common.config.LocksConfig;
 import melonslise.locks.common.init.LocksCapabilities;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.AttachFace;
+import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.core.Direction;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.AABB;
@@ -21,6 +27,7 @@ import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
+import net.minecraftforge.fml.ModList;
 
 public final class LocksUtil
 {
@@ -125,5 +132,49 @@ public final class LocksUtil
 			if(be instanceof RandomizableContainerBlockEntity container && container.lootTable != null)
 				container.unpackLootTable(player);
 		}
+	}
+
+	// Single source of truth for "what lock goes on this chest", shared by worldgen
+	// (LockChestsFeature) and the Respawning Structures compat hook. Returns a ready-to-register
+	// Lockable for the chest at pos, or null if it shouldn't be locked (not a valid lootable chest,
+	// failed the generation chance, the right half of a double chest, or no lock tier matched).
+	// access is used for block/block-entity lookups; level provides the lockable handler + server.
+	public static Lockable createChestLockable(LevelAccessor access, Level level, BlockPos pos, RandomSource rng)
+	{
+		BlockState state = access.getBlockState(pos);
+		if(!state.hasProperty(ChestBlock.TYPE))
+			return null;
+		boolean lootr = ModList.get().isLoaded("lootr");
+		// The right half of a double chest is covered by the left half's lockable, so skip it
+		// (unless Lootr is present, where each half is an independent single chest)
+		if(state.getValue(ChestBlock.TYPE) == ChestType.RIGHT && !lootr)
+			return null;
+		BlockEntity be = access.getBlockEntity(pos);
+		if(!(be instanceof RandomizableContainerBlockEntity container) || container.lootTable == null)
+			return null;
+
+		if(!chance(rng, LocksConfig.GENERATION_CHANCE.get()))
+			return null;
+
+		ItemStack stack = ItemStack.EMPTY;
+		boolean usedLootScaling = false;
+		if(LocksConfig.LOOT_SCALED_LOCKS.get())
+		{
+			double lootValue = LootValueCalculator.getLootValue(level.getServer(), container.lootTable);
+			if(!Double.isNaN(lootValue))
+			{
+				stack = LocksConfig.getLockForLootValue(lootValue, rng);
+				usedLootScaling = true;
+			}
+		}
+		if(!usedLootScaling)
+			stack = LocksConfig.getRandomLock(rng);
+
+		// When loot-scaled locks are enabled and the loot value is below all tier thresholds, skip this chest
+		if(stack.isEmpty())
+			return null;
+
+		BlockPos pos1 = state.getValue(ChestBlock.TYPE) == ChestType.SINGLE || lootr ? pos : pos.relative(ChestBlock.getConnectedDirection(state));
+		return new Lockable(new Cuboid6i(pos, pos1), Lock.from(stack), Transform.fromDirection(state.getValue(ChestBlock.FACING), Direction.NORTH), stack, level);
 	}
 }

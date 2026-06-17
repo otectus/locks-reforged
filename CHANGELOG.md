@@ -1,5 +1,12 @@
 # Locks Reforged Changelog
 
+## 1.6.1
+
+### Respawning Structures Compatibility
+- Added compatibility with the **Respawning Structures** mod (`someaddons/respawningstructures`). When that mod regenerates a structure, it re-places the structure's chests and loot by replaying its structure pieces, which does not re-run biome decoration — so our `LockChestsFeature` never fired again and respawned chests came back unlocked. Locks Reforged now re-locks the chests of a respawned structure automatically.
+- Implemented as a soft dependency via Respawning Structures' public `StructureRespawnEvents.AFTER_RESPAWN_EVENT` callback (wired by reflection, so there is no hard dependency and no effect when the mod is absent). After a structure respawns, stale lockables overlapping the structure footprint are cleared and the freshly placed chests are re-locked using the **same rules as world generation** (generation chance, loot-scaled tiers, and enchant chance), so the lock distribution matches a newly generated structure. Double chests receive a single lock spanning both halves.
+- Extracted the per-chest lock selection logic into a shared `LocksUtil.createChestLockable(...)` helper so world generation and the respawn path stay identical; normal world-generation behavior is unchanged.
+
 ## 1.6.0
 
 ### C2ME / Async Chunk Compatibility
