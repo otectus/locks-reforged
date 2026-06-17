@@ -29,6 +29,7 @@ import melonslise.locks.common.item.LockingItem;
 import melonslise.locks.common.util.Lockable;
 import melonslise.locks.common.util.LocksUtil;
 import melonslise.locks.common.util.LootValueCalculator;
+import melonslise.locks.common.util.ShockingHelper;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -40,7 +41,6 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.entity.npc.VillagerProfession;
 import net.minecraft.world.entity.npc.VillagerTrades;
 import net.minecraft.world.entity.npc.VillagerTrades.ItemListing;
 import net.minecraft.world.entity.player.Player;
@@ -49,6 +49,7 @@ import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.storage.loot.LootPool;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
@@ -73,6 +74,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.network.NetworkHooks;
+import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.server.ServerLifecycleHooks;
 
 @Mod.EventBusSubscriber(modid = Locks.ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
@@ -156,38 +158,66 @@ public final class LocksForgeEvents
 	@SubscribeEvent
 	public static void addVillagerTrades(VillagerTradesEvent e)
 	{
-		if(e.getType() != VillagerProfession.TOOLSMITH)
+		if(!LocksServerConfig.ENABLE_VILLAGER_TRADES.get())
 			return;
+		ResourceLocation wantedProfession = ResourceLocation.tryParse(LocksServerConfig.VILLAGER_PROFESSION.get());
+		if(wantedProfession == null || !wantedProfession.equals(ForgeRegistries.VILLAGER_PROFESSIONS.getKey(e.getType())))
+			return;
+		boolean picks = LocksServerConfig.ENABLE_VILLAGER_LOCKPICK_TRADES.get();
+		boolean mechs = LocksServerConfig.ENABLE_VILLAGER_MECHANISM_TRADES.get();
+		boolean locks = LocksServerConfig.ENABLE_VILLAGER_LOCK_TRADES.get();
 		Int2ObjectMap<List<ItemListing>> levels = e.getTrades();
 		List<ItemListing> trades;
+
 		trades = levels.get(1);
-		trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.WOOD_LOCK_PICK.get()), 1, 2, 16, 2, 0.05f));
-		trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.WOOD_LOCK_MECHANISM.get()), 2, 1, 12, 1, 0.2f));
+		if(picks) trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.WOOD_LOCK_PICK.get()), 1, 2, 16, 2, 0.05f));
+		if(mechs) trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.WOOD_LOCK_MECHANISM.get()), 2, 1, 12, 1, 0.2f));
+		if(locks) trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.WOOD_LOCK.get()), 3, 1, 12, 2, 0.2f));
+
 		trades = levels.get(2);
-		trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.IRON_LOCK_PICK.get()), 2, 2, 16, 5, 0.05f));
+		if(picks) trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.IRON_LOCK_PICK.get()), 2, 2, 16, 5, 0.05f));
+		if(locks) trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.COPPER_LOCK.get()), 4, 1, 12, 5, 0.2f));
+
 		trades = levels.get(3);
-		trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.GOLD_LOCK_PICK.get()), 6, 2, 12, 20, 0.05f));
-		trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.IRON_LOCK_MECHANISM.get()), 5, 1, 8, 10, 0.2f));
+		if(picks) trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.GOLD_LOCK_PICK.get()), 6, 2, 12, 20, 0.05f));
+		if(mechs) trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.IRON_LOCK_MECHANISM.get()), 5, 1, 8, 10, 0.2f));
+		if(locks) trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.IRON_LOCK.get()), 6, 1, 8, 10, 0.2f));
+
 		trades = levels.get(4);
-		trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.STEEL_LOCK_PICK.get()), 4, 2, 16, 20, 0.05f));
+		if(picks) trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.STEEL_LOCK_PICK.get()), 4, 2, 16, 20, 0.05f));
+
 		trades = levels.get(5);
-		trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.DIAMOND_LOCK_PICK.get()), 8, 2, 12, 30, 0.05f));
-		trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.NETHERITE_LOCK_PICK.get()), 16, 1, 6, 30, 0.05f));
-		trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.STEEL_LOCK_MECHANISM.get()), 8, 1, 8, 30, 0.2f));
+		if(picks)
+		{
+			trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.DIAMOND_LOCK_PICK.get()), 8, 2, 12, 30, 0.05f));
+			trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.NETHERITE_LOCK_PICK.get()), 16, 1, 6, 30, 0.05f));
+		}
+		if(mechs) trades.add(new VillagerTrades.ItemsForEmeralds(new ItemStack(LocksItems.STEEL_LOCK_MECHANISM.get()), 8, 1, 8, 30, 0.2f));
 	}
 
 	@SubscribeEvent
 	public static void addWandererTrades(WandererTradesEvent e)
 	{
-		List<ItemListing> trades;
-		trades = e.getGenericTrades();
-		trades.add(new VillagerTrades.ItemsForEmeralds(LocksItems.GOLD_LOCK_PICK.get(), 5, 2, 6, 1));
-		trades.add(new VillagerTrades.ItemsForEmeralds(LocksItems.STEEL_LOCK_PICK.get(), 3, 2, 8, 1));
-		trades.add(new VillagerTrades.EnchantedItemForEmeralds(LocksItems.STEEL_LOCK.get(), 16, 4, 1));
-		trades = e.getRareTrades();
-		trades.add(new VillagerTrades.ItemsForEmeralds(LocksItems.STEEL_LOCK_MECHANISM.get(), 6, 1, 4, 1));
-		trades.add(new VillagerTrades.EnchantedItemForEmeralds(LocksItems.DIAMOND_LOCK.get(), 28, 4, 1));
-		trades.add(new VillagerTrades.EnchantedItemForEmeralds(LocksItems.NETHERITE_LOCK.get(), 40, 4, 1));
+		if(!LocksServerConfig.ENABLE_WANDERER_TRADES.get())
+			return;
+		boolean picks = LocksServerConfig.ENABLE_WANDERER_LOCKPICK_TRADES.get();
+		boolean locks = LocksServerConfig.ENABLE_WANDERER_LOCK_TRADES.get();
+		boolean mechs = LocksServerConfig.ENABLE_WANDERER_MECHANISM_TRADES.get();
+		List<ItemListing> generic = e.getGenericTrades();
+		List<ItemListing> rare = e.getRareTrades();
+		if(picks)
+		{
+			generic.add(new VillagerTrades.ItemsForEmeralds(LocksItems.GOLD_LOCK_PICK.get(), 5, 2, 6, 1));
+			generic.add(new VillagerTrades.ItemsForEmeralds(LocksItems.STEEL_LOCK_PICK.get(), 3, 2, 8, 1));
+		}
+		if(locks)
+		{
+			generic.add(new VillagerTrades.EnchantedItemForEmeralds(LocksItems.STEEL_LOCK.get(), 16, 4, 1));
+			rare.add(new VillagerTrades.EnchantedItemForEmeralds(LocksItems.DIAMOND_LOCK.get(), 28, 4, 1));
+			rare.add(new VillagerTrades.EnchantedItemForEmeralds(LocksItems.NETHERITE_LOCK.get(), 40, 4, 1));
+		}
+		if(mechs)
+			rare.add(new VillagerTrades.ItemsForEmeralds(LocksItems.STEEL_LOCK_MECHANISM.get(), 6, 1, 4, 1));
 	}
 
 	@SubscribeEvent
@@ -198,10 +228,21 @@ public final class LocksForgeEvents
 		ILockableHandler handler = ch.getLevel().getCapability(LocksCapabilities.LOCKABLE_HANDLER).orElse(null);
 		if(handler == null)
 			return;
+		int chX = ch.getPos().x, chZ = ch.getPos().z;
+		Level level = ch.getLevel();
 		ch.getCapability(LocksCapabilities.LOCKABLE_STORAGE).ifPresent(storage -> storage.get().values().forEach(lkb ->
 		{
-			handler.getLoaded().remove(lkb.id);
-			lkb.deleteObserver(handler);
+			// A lockable straddling a chunk border lives in multiple chunk storages but only once
+			// in the handler. Only drop it from the handler (and stop observing it) once no other
+			// chunk it occupies is still loaded — otherwise it vanishes from rendering/sync while
+			// a neighbouring chunk that still contains it stays loaded.
+			boolean anyOtherLoaded = !lkb.bb.getContainedChunks((x, z) ->
+				!(x == chX && z == chZ) && level.hasChunk(x, z));
+			if(!anyOtherLoaded)
+			{
+				handler.getLoaded().remove(lkb.id);
+				lkb.deleteObserver(handler);
+			}
 		}));
 	}
 
@@ -411,6 +452,8 @@ public final class LocksForgeEvents
 					{
 						// No matching item anywhere: rattle (unless Silent enchantment)
 						lkb.swing(20);
+						// Optional theft punishment: shock the player for interacting with a locked block without a key (off by default)
+						ShockingHelper.tryShock(player, lkb.stack, Vec3.atCenterOf(pos), ShockingHelper.Trigger.UNAUTHORIZED_INTERACTION);
 						if(!LocksServerConfig.ENABLE_SILENT.get() || EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.SILENT.get(), lkb.stack) == 0)
 						{
 							world.playSound(player, pos, LocksSoundEvents.LOCK_RATTLE.get(), SoundSource.BLOCKS, 1f, 1f);
@@ -634,7 +677,30 @@ public final class LocksForgeEvents
 	@SubscribeEvent
 	public static void onBlockBreak(BlockEvent.BreakEvent e)
 	{
-		if(!canBreakLockable(e.getPlayer(), e.getPos()))
-			e.setCanceled(true);
+		if(canBreakLockable(e.getPlayer(), e.getPos()))
+			return;
+		e.setCanceled(true);
+		// Optional theft punishment: shock the player for trying to break a protected locked block (off by default).
+		// canBreakLockable already exempts creative players, so this only fires in survival.
+		if(ShockingHelper.isTriggerEnabled(ShockingHelper.Trigger.BLOCK_BREAK_ATTEMPT))
+		{
+			Lockable lkb = findLockedAt(e.getPlayer().level(), e.getPos());
+			if(lkb != null)
+				ShockingHelper.tryShock(e.getPlayer(), lkb.stack, Vec3.atCenterOf(e.getPos()), ShockingHelper.Trigger.BLOCK_BREAK_ATTEMPT);
+		}
+	}
+
+	private static Lockable findLockedAt(Level world, BlockPos pos)
+	{
+		ILockableHandler handler = world.getCapability(LocksCapabilities.LOCKABLE_HANDLER).orElse(null);
+		if(handler == null)
+			return null;
+		Int2ObjectMap<Lockable> chunkLockables = handler.getInChunk(pos);
+		if(chunkLockables == null)
+			return null;
+		for(Lockable lkb : chunkLockables.values())
+			if(lkb.lock.isLocked() && lkb.bb.intersects(pos))
+				return lkb;
+		return null;
 	}
 }

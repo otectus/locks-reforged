@@ -19,7 +19,7 @@ This port preserves the original mod's license: **Attribution-NonCommercial 3.0 
 
 The original Locks mod was built for Minecraft 1.16.5 (Forge 36.x). This port updates it to Minecraft 1.20.1 (Forge 47.x) while preserving all original gameplay mechanics, item IDs, config keys, and network protocol.
 
-**Version:** 1.5.4 | **Minecraft:** 1.20.1 | **Forge:** 47.2.0+ | **Java:** 17
+**Version:** 1.6.0 | **Minecraft:** 1.20.1 | **Forge:** 47.2.0+ | **Java:** 17
 
 ## Features
 
@@ -56,10 +56,12 @@ An interactive lock picking mechanic with a pin-matching system. Each lock has a
 Each enchantment can be individually enabled or disabled in the server config.
 
 ### World Generation
-All generated chests with loot tables spawn with a lock. Lock tier is determined by **loot value** — chests with better loot get stronger locks, and chests below all tier thresholds get a wooden lock as a minimum. The system samples each loot table multiple times and averages the results for consistent tier assignments, uses sub-linear stack count scaling so bulk common items don't inflate value, and supports per-item value overrides for materials like diamonds and netherite that are valuable but have common rarity. Can be switched to random weighted selection in the common config.
+Generated chests can spawn with a lock whose tier is chosen by **loot value** — the richer a chest's loot table, the stronger its lock. Chests whose loot value falls **below the lowest configured threshold receive no lock at all**, while very valuable chests can receive diamond or netherite locks. The estimator weighs item rarity, enchantments, and stack counts (with sub-linear scaling so bulk common items don't inflate value) and supports per-item value overrides for materials like diamonds and netherite that are valuable despite a common rarity. The whole system can be switched to random weighted selection in the common config.
+
+> **Can I make diamond/netherite locks appear only on high-value chests?** Yes — raise the upper **Loot Value Tiers** so only the richest loot reaches them, and raise the lowest threshold so poor chests get no lock. See [Configuration](#high-value-chest-locks-diamondnetherite) for a worked example.
 
 ### Villager & Wandering Trader Integration
-Toolsmith villagers sell lock picks and lock mechanisms at various profession levels. Wandering traders offer rare lock picks and enchanted locks.
+A configurable villager profession (default toolsmith) sells lock picks and lock mechanisms, and the wandering trader offers lock picks and enchanted locks. Every category — lock picks, locks, and mechanisms — can be toggled independently in the server config, so you can disable easy lock picks while still selling locks. Villager lock sales (early-game wood/copper/iron locks) are available as an opt-in.
 
 ### Loot Table Integration
 Lock picks and lock mechanisms can be found in dungeon, temple, and other structure chests.
@@ -156,11 +158,12 @@ Only fields present in the override are changed; omitted fields keep their defau
 ## Configuration
 
 ### Common Config (`locks-common.toml`)
-- **Generation Chance** -- Legacy setting, no longer used. All generated chests now receive a lock unconditionally
-- **Enchant Chance** -- Probability of generated locks being enchanted (default: 40%)
-- **Lock Types & Weights** -- Which locks generate and their relative rarity
-- **Randomize Loaded Locks** -- Whether to randomize lock combinations on chunk load
-- **Loot-Scaled Locks** -- When enabled (default), lock tier is chosen based on chest loot value instead of random selection. Configurable item value formula with rarity multipliers, enchantment bonuses, per-tier value thresholds, multi-sample averaging (default: 32 samples), sub-linear stack count scaling, and per-item value overrides.
+- **Lock Generation Chance** -- Chance (0.0–1.0) that a generated chest receives a lock. Default 1.0 (every chest); lower it to skip some
+- **Generation Enchant Chance** -- Probability of generated locks being enchanted (default: 40%)
+- **Generated Locks & Generated Lock Chances** -- Which locks generate and their relative weights (used when Loot-Scaled Locks is disabled)
+- **Randomize Loaded Locks** -- Whether to randomize lock combinations when loading them from structure files
+- **Loot-Scaled Locks** -- When enabled (default), lock tier is chosen from a chest's loot value instead of random weights. Configurable item value formula with rarity multipliers, enchantment bonuses, per-tier value thresholds (**Loot Value Tiers**), sub-linear stack count scaling, and per-item value overrides. Chests below the lowest tier threshold receive **no lock**
+- **Lock Stats & Lockpick Stats** -- Override built-in lock and lock pick stats without datapacks (set any value to -1 to keep the JSON default)
 
 ### Client Config (`locks-client.toml`)
 - **Deaf Mode** -- Enables visual feedback for the lock picking mechanic
@@ -168,10 +171,62 @@ Only fields present in the override are changed; omitted fields keep their defau
 ### Server Config (`locks-server.toml`)
 - **Allow Removing Locks** -- Whether players can remove unlocked locks by shift-right-clicking
 - **Protect Lockables** -- Whether locked blocks are protected from being broken
-- **Hide Lock ID** -- Hides the lock ID line from both inventory and HUD tooltips (default: false)
-- **Hide HUD Enchantments** -- Hides enchantment lines from the HUD floating tooltip only; inventory tooltips are unaffected (default: false)
+- **Max Lockable Volume / Lockable Blocks / Lockable Tags** -- What can be locked and how large a single lock may be
+- **Display** (Hide Lock ID / Hide HUD Enchantments / Hide HUD Tooltip) -- Tooltip and HUD visibility toggles
 - **Enchantment Toggles** -- Each of the 7 enchantments (Shocking, Sturdy, Complexity, Silent, Auto-Pick, Reinforced, Awareness) can be individually enabled or disabled
+- **Shocking** subsection -- Tune Shocking damage and theft punishments (see below)
 - **Netherite Lockpick Unbreakable** -- When enabled, netherite lock picks never break during lock picking (default: false)
+- **Loot Table Injection Patterns** -- Which loot tables receive lock pick / key injection (default: `minecraft:chests/`)
+- **Trades** subsection -- Configure villager and wandering trader sales (see below)
+
+#### Shocking & Theft Punishment (`[Enchantments.Shocking]`)
+
+The Shocking enchantment punishes thieves. **By default, Shocking deals 1.5 damage per enchantment level when a lock pick breaks** — exactly as in previous versions. The formula and what triggers it are now configurable:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `Shocking Damage Base` | 0.0 | Flat damage regardless of level (2.0 = 1 heart) |
+| `Shocking Damage Per Level` | 1.5 | Damage per enchantment level. Final damage = Base + level × Per Level, clamped to Max |
+| `Shocking Max Damage` | 1024.0 | Upper clamp (effectively uncapped) |
+| `Shocking Requires Enchantment` | true | If false, *every* lock shocks (as level 1 when unenchanted) |
+| `Shocking Cooldown Ticks` | 0 | Min ticks between shocks to the same player (0 = none). Raise to ~20 when enabling the triggers below |
+| `Shocking Triggers On Pick Break` | true | The original behavior: shock when a lock pick breaks |
+| `Shocking Triggers On Wrong Pin` | false | Shock on each wrong pin during picking |
+| `Shocking Triggers On Unauthorized Interaction` | false | Shock when interacting with a locked block without a key |
+| `Shocking Triggers On Block Break Attempt` | false | Shock when trying to break a protected locked block |
+
+Creative players are exempt. To make locks aggressively punish theft, enable the extra triggers (and optionally set `Shocking Requires Enchantment = false` so even plain locks bite). To make Shocking hurt more, raise `Shocking Damage Per Level` or `Shocking Damage Base`.
+
+#### Trades (`[Trades]`)
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `Villager.Enable Villager Trades` | true | Master switch for villager lock trades |
+| `Villager.Enable Villager Lockpick Trades` | true | Sell lock picks (set false to remove the powerful early lock picks) |
+| `Villager.Enable Villager Lock Trades` | false | **Opt-in:** sell wood/copper/iron locks at levels 1–3 |
+| `Villager.Enable Villager Lock Mechanism Trades` | true | Sell lock mechanisms |
+| `Villager.Villager Profession` | `minecraft:toolsmith` | Which profession offers lock trades |
+| `Wandering Trader.Enable Wandering Trader Trades` | true | Master switch for wanderer lock trades |
+| `Wandering Trader.Enable Wandering Trader Lockpick Trades` | true | Sell lock picks |
+| `Wandering Trader.Enable Wandering Trader Lock Trades` | true | Sell enchanted steel/diamond/netherite locks |
+| `Wandering Trader.Enable Wandering Trader Lock Mechanism Trades` | true | Sell lock mechanisms |
+
+**To disable lock pick sales while keeping locks purchasable** (lock picks are powerful; locks help early-game chest protection): set `Enable Villager Lockpick Trades = false` and `Enable Villager Lock Trades = true` (and similarly `Enable Wandering Trader Lockpick Trades = false` while keeping `Enable Wandering Trader Lock Trades = true`). All default trades are unchanged when the config is left at defaults.
+
+#### High-Value Chest Locks (diamond/netherite)
+
+Loot-scaled lock generation reserves the best locks for the best chests. The **Loot Value Tiers** list (in `locks-common.toml`) holds one minimum value per entry in **Generated Locks** (same order). A chest receives the highest tier whose threshold its loot value meets; below the lowest threshold it gets no lock.
+
+To make **diamond or better appear only on high-value chests**, raise the upper thresholds and the floor. With the default seven locks (`wood, copper, iron, steel, gold, diamond, netherite`):
+
+```toml
+[Loot-Scaled Locks]
+    Enable Loot-Scaled Locks = true
+    #                   wood  copper iron  steel gold  diamond netherite
+    Loot Value Tiers = [10.0, 20.0,  35.0, 50.0, 65.0, 90.0,   150.0]
+```
+
+Now a chest worth ~95 gets a **diamond** lock, one worth ~160 gets **netherite**, ordinary chests get wood→gold, and chests worth under 10 get **no lock**. Tune `Default Item Value`, the rarity multipliers, and `Item Value Overrides` to change how loot value is scored.
 
 ## Building from Source
 
@@ -185,7 +240,7 @@ cd "Locks Reforged"
 # Build the mod JAR
 JAVA_HOME="/path/to/jdk-17" ./gradlew build
 
-# Output: build/libs/locks_reforged-1.5.4.jar
+# Output: build/libs/locks_reforged-1.6.0.jar
 
 # Run the development client
 JAVA_HOME="/path/to/jdk-17" ./gradlew runClient
@@ -194,7 +249,7 @@ JAVA_HOME="/path/to/jdk-17" ./gradlew runClient
 ## Installation
 
 1. Install [Minecraft Forge 1.20.1](https://files.minecraftforge.net/net/minecraftforge/forge/index_1.20.1.html) (47.2.0 or later)
-2. Download `locks_reforged-1.5.4.jar` from the releases
+2. Download `locks_reforged-1.6.0.jar` from the releases
 3. Place the JAR in your `.minecraft/mods/` folder
 4. Launch Minecraft with the Forge profile
 

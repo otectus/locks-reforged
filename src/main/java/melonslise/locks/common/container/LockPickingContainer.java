@@ -8,7 +8,6 @@ import melonslise.locks.common.capability.ILockableHandler;
 import melonslise.locks.common.config.LocksServerConfig;
 import melonslise.locks.common.init.LocksCapabilities;
 import melonslise.locks.common.init.LocksMenuTypes;
-import melonslise.locks.common.init.LocksDamageSources;
 import melonslise.locks.common.init.LocksEnchantments;
 import melonslise.locks.common.init.LocksItemTags;
 import melonslise.locks.common.init.LocksTagHelper;
@@ -18,6 +17,7 @@ import melonslise.locks.common.item.LockPickItem;
 import melonslise.locks.common.network.toclient.TryPinResultPacket;
 import melonslise.locks.common.util.Lockable;
 import melonslise.locks.common.util.LocksUtil;
+import melonslise.locks.common.util.ShockingHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
@@ -132,14 +132,14 @@ public class LockPickingContainer extends AbstractContainerMenu
 			{
 				reset = true;
 				this.reset();
-				if(this.shocking > 0)
-				{
-					this.player.hurt(LocksDamageSources.shock(player.level()), shocking * 1.5f);
-					this.player.level().playSound(null, this.player.position().x, this.player.position().y, this.player.position().z, LocksSoundEvents.SHOCK.get(), SoundSource.BLOCKS, 1f, 1f);
-				}
+				ShockingHelper.tryShock(this.player, this.lockable.stack, this.player.position(), ShockingHelper.Trigger.PICK_BREAK);
 			}
 			else
+			{
+				// Wrong pin without a broken pick — opt-in punishment, off by default (mutually exclusive with PICK_BREAK above)
+				ShockingHelper.tryShock(this.player, this.lockable.stack, this.pos, ShockingHelper.Trigger.WRONG_PIN);
 				this.player.level().playSound(null, this.pos.x, this.pos.y, this.pos.z, LocksSoundEvents.PIN_FAIL.get(), SoundSource.BLOCKS, 1f, 1f);
+			}
 		}
 		LocksNetwork.MAIN.send(PacketDistributor.PLAYER.with(() -> (ServerPlayer) this.player), new TryPinResultPacket(correct, reset));
 	}

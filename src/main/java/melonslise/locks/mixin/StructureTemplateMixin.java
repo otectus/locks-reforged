@@ -19,6 +19,7 @@ import melonslise.locks.common.util.Cuboid6i;
 import melonslise.locks.common.util.Lock;
 import melonslise.locks.common.util.Lockable;
 import melonslise.locks.common.util.LockableInfo;
+import melonslise.locks.common.util.LocksThreadUtil;
 import melonslise.locks.common.util.LocksUtil;
 import melonslise.locks.common.util.Transform;
 import net.minecraft.core.BlockPos;
@@ -54,13 +55,15 @@ public class StructureTemplateMixin
 			if(handler == null)
 				return;
 			Cuboid6i bb = new Cuboid6i(start, start.offset(size.getX() - 1, size.getY() - 1, size.getZ() - 1));
-			handler.getLoaded().values().stream()
-				.filter(lkb -> lkb.bb.intersects(bb))
-				.forEach(lkb ->
-				{
-					Cuboid6i newBB = bb.intersection(lkb.bb).offset(-start.getX(), -start.getY(), -start.getZ());
-					this.lockableInfos.add(new LockableInfo(newBB, lkb.lock, lkb.tr, lkb.stack, lkb.id));
-				});
+			// Snapshot the handler's lockables before iterating to avoid ConcurrentModificationException
+			// if the handler is mutated on another path (relevant under async chunk mods like C2ME).
+			for(Lockable lkb : new ArrayList<>(handler.getLoaded().values()))
+			{
+				if(!lkb.bb.intersects(bb))
+					continue;
+				Cuboid6i newBB = bb.intersection(lkb.bb).offset(-start.getX(), -start.getY(), -start.getZ());
+				this.lockableInfos.add(new LockableInfo(newBB, lkb.lock, lkb.tr, lkb.stack, lkb.id));
+			}
 		}
 	}
 
@@ -81,6 +84,10 @@ public class StructureTemplateMixin
 		ILockableHandler handler = level.getCapability(LocksCapabilities.LOCKABLE_HANDLER).orElse(null);
 		if(handler == null)
 			return;
+		// Build the lockables now (so RNG consumption and transforms keep their exact timing), then defer
+		// only the handler mutation + packet sync. Without C2ME this runs inline on the server thread and
+		// behavior is unchanged; under C2ME it is deferred to the main thread to keep the handler map safe.
+		List<Lockable> built = new ArrayList<>();
 		for(LockableInfo lkb : this.lockableInfos)
 		{
 			BlockPos pos1 = LocksUtil.transform(lkb.bb.x1, lkb.bb.y1, lkb.bb.z1, settings);
@@ -89,8 +96,16 @@ public class StructureTemplateMixin
 			ItemStack stack = LocksConfig.RANDOMIZE_LOADED_LOCKS.get() ? LocksConfig.getRandomLock(rng) : lkb.stack;
 			Lock lock = LocksConfig.RANDOMIZE_LOADED_LOCKS.get() ? Lock.from(stack) : lkb.lock;
 			Transform tr = Transform.fromDirectionAndFace(settings.getRotation().rotate(settings.getMirror().getRotation(lkb.tr.dir).rotate(lkb.tr.dir)), lkb.tr.face, Direction.NORTH);
-			handler.add(new Lockable(bb, lock, tr, stack, level));
+			built.add(new Lockable(bb, lock, tr, stack, level));
 		}
+		if(built.isEmpty())
+			return;
+		ILockableHandler handlerFinal = handler;
+		LocksThreadUtil.runOnServerThread(level.getServer(), () ->
+		{
+			for(Lockable lkb : built)
+				handlerFinal.add(lkb);
+		});
 	}
 
 	private static final String KEY_LOCKABLES = "Lockables";

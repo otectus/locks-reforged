@@ -29,17 +29,25 @@ public final class LocksCapabilities
 
 	public static void attachToWorld(AttachCapabilitiesEvent<Level> e)
 	{
-		e.addCapability(LockableHandler.ID, new SerializableCapabilityProvider(LOCKABLE_HANDLER, new LockableHandler(e.getObject())));
+		SerializableCapabilityProvider provider = new SerializableCapabilityProvider(LOCKABLE_HANDLER, new LockableHandler(e.getObject()));
+		e.addCapability(LockableHandler.ID, provider);
+		e.addListener(provider::invalidate);
 	}
 
 	public static void attachToChunk(AttachCapabilitiesEvent<LevelChunk> e)
 	{
-		e.addCapability(LockableStorage.ID, new SerializableCapabilityProvider(LOCKABLE_STORAGE, new LockableStorage(e.getObject())));
+		SerializableCapabilityProvider provider = new SerializableCapabilityProvider(LOCKABLE_STORAGE, new LockableStorage(e.getObject()));
+		e.addCapability(LockableStorage.ID, provider);
+		e.addListener(provider::invalidate);
 	}
 
 	public static void attachToEntity(AttachCapabilitiesEvent<Entity> e)
 	{
 		if(e.getObject() instanceof Player)
-			e.addCapability(Selection.ID, new CapabilityProvider(SELECTION, new Selection()));
+		{
+			CapabilityProvider provider = new CapabilityProvider(SELECTION, new Selection());
+			e.addCapability(Selection.ID, provider);
+			e.addListener(provider::invalidate);
+		}
 	}
 }

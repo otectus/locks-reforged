@@ -31,6 +31,12 @@ public class SerializableCapabilityProvider<A extends INBTSerializable<T>, T ext
 		return ((Capability<A>) this.cap).orEmpty(queryCap, this.lazyInst);
 	}
 
+	// Invalidate the held LazyOptional when the holder is detached (chunk unload, level unload, etc.)
+	public void invalidate()
+	{
+		this.lazyInst.invalidate();
+	}
+
 	@Override
 	public T serializeNBT()
 	{

@@ -2,6 +2,7 @@ package melonslise.locks.common.network.toclient;
 
 import java.util.function.Supplier;
 
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import melonslise.locks.common.init.LocksCapabilities;
 import melonslise.locks.common.util.Lockable;
 import net.minecraft.client.Minecraft;
@@ -44,11 +45,15 @@ public class UpdateLockablePacket
 			@Override
 			public void run()
 			{
+				if(Minecraft.getInstance().level == null)
+					return;
 				Minecraft.getInstance().level.getCapability(LocksCapabilities.LOCKABLE_HANDLER).ifPresent(handler ->
 				{
-					Lockable lkb = handler.getLoaded().get(pkt.id);
-					if(lkb != null)
-						lkb.lock.setLocked(pkt.locked);
+					Int2ObjectMap<Lockable> lkbs = handler.getLoaded();
+					Lockable lkb = lkbs.get(pkt.id);
+					if(lkb == lkbs.defaultReturnValue())
+						return;
+					lkb.lock.setLocked(pkt.locked);
 				});
 			}
 		});

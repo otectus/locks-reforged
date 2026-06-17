@@ -4,6 +4,10 @@
 
 1. **Refmap warning in dev**: The mixin refmap (`locks.refmap.json`) shows "could not be read" in the dev environment. This is a known MixinGradle/ForgeGradle cosmetic issue — dev uses official (Mojang) names which match source annotations directly, so no remapping is needed. The refmap IS correctly included in the production JAR. No fix required.
 
+## Resolved Compatibility Issues
+
+- **C2ME crash — `ArrayIndexOutOfBoundsException` in `LevelChunk`** *(fixed in 1.6.0, issue #10)*: C2ME (Concurrent Chunk Management Engine) runs chunk loading/generation on parallel worker threads. `LevelChunkMixin` was mutating the world-global `LockableHandler.lockables` map (a non-thread-safe `Int2ObjectLinkedOpenHashMap`), registering observers, and sending packets directly from the `LevelChunk` constructor — so several chunks loading at once corrupted the shared map's backing array, surfacing as an `ArrayIndexOutOfBoundsException`. Fixed by funneling all handler mutation and packet sync onto the main server thread via `LocksThreadUtil.runOnServerThread` (inline when already on the server thread, deferred to the next tick otherwise). The same deferral was applied to `StructureTemplateMixin#placeInWorld`; `ChunkMapMixin` and `StructureTemplateMixin#fillFromWorld` now snapshot lockable collections before iterating; and `LootValueCalculator`'s cache is now a `ConcurrentHashMap`. Behavior without C2ME is unchanged. A one-time INFO log notes when the off-thread deferral path first activates.
+
 ## Resolved (Inherited from 1.16.5)
 
 - **Lock reshuffling doesn't persist** *(fixed)*: The original mod regenerated lock combinations from the lock ID seed on every load. If a combination was ever reshuffled at runtime, the change would be lost. Fixed by storing the `combo` byte array directly in NBT (`Lock.toNbt`/`fromNbt`) and syncing it over the network (`Lock.toBuf`/`fromBuf`). Backward compatible — locks saved without a `Combo` tag fall back to seed-based generation.

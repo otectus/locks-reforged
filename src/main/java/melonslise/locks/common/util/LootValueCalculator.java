@@ -1,9 +1,9 @@
 package melonslise.locks.common.util;
 
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -26,7 +26,9 @@ import net.minecraftforge.registries.ForgeRegistries;
 public final class LootValueCalculator
 {
 	private static final Gson GSON = new Gson();
-	private static final Map<ResourceLocation, Double> cache = new HashMap<>();
+	// Thread-safe: getLootValue() can be called from worldgen worker threads (more so under C2ME),
+	// which may insert freshly-computed values concurrently. No null values are ever stored.
+	private static final Map<ResourceLocation, Double> cache = new ConcurrentHashMap<>();
 
 	private LootValueCalculator() {}
 

@@ -1,5 +1,7 @@
 package melonslise.locks.mixin;
 
+import java.util.ArrayList;
+
 import org.apache.commons.lang3.mutable.MutableObject;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -9,6 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import melonslise.locks.common.init.LocksCapabilities;
 import melonslise.locks.common.init.LocksNetwork;
 import melonslise.locks.common.network.toclient.AddLockableToChunkPacket;
+import melonslise.locks.common.util.Lockable;
 import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerPlayer;
@@ -22,6 +25,11 @@ public class ChunkMapMixin
 	private void playerLoadedChunk(ServerPlayer player, MutableObject<ClientboundLevelChunkWithLightPacket> packetHolder, LevelChunk ch, CallbackInfo ci)
 	{
 		ch.getCapability(LocksCapabilities.LOCKABLE_STORAGE).ifPresent(st ->
-			st.get().values().forEach(lkb -> LocksNetwork.MAIN.send(PacketDistributor.PLAYER.with(() -> player), new AddLockableToChunkPacket(lkb, ch))));
+		{
+			// Snapshot the lockables so iteration can't throw ConcurrentModificationException if the
+			// handler/storage is mutated on another path while this player is being synced.
+			for(Lockable lkb : new ArrayList<>(st.get().values()))
+				LocksNetwork.MAIN.send(PacketDistributor.PLAYER.with(() -> player), new AddLockableToChunkPacket(lkb, ch));
+		});
 	}
 }

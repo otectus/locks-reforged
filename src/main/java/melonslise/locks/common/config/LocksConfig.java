@@ -51,7 +51,6 @@ public final class LocksConfig
 	public static final ForgeConfigSpec.DoubleValue RARITY_RARE_MULT;
 	public static final ForgeConfigSpec.DoubleValue RARITY_EPIC_MULT;
 	public static final ForgeConfigSpec.ConfigValue<List<? extends Double>> LOOT_VALUE_TIERS;
-	public static final ForgeConfigSpec.IntValue LOOT_VALUE_SAMPLES;
 	public static final ForgeConfigSpec.ConfigValue<List<? extends String>> ITEM_VALUE_OVERRIDES;
 
 	public static NavigableMap<Integer, Item> weightedGeneratedLocks;
@@ -162,16 +161,16 @@ public final class LocksConfig
 			.comment("Value multiplier for EPIC rarity items")
 			.defineInRange("Epic Rarity Multiplier", 5.0d, 0.01d, 100d);
 		LOOT_VALUE_TIERS = cfg
-			.comment("Minimum loot value thresholds for each lock in the 'Generated Locks' list.",
+			.comment("Minimum loot value thresholds for each lock in the 'Generated Locks' list (same order).",
 				"WARNING: THE AMOUNT OF NUMBERS SHOULD BE EQUAL TO THE AMOUNT OF GENERATED LOCK ITEMS!!!",
-				"A chest's total loot value is compared against these thresholds to select the lock tier.",
-				"If the value is below the lowest threshold, no lock is generated.",
-				"Defaults: wood=3, copper=6, iron=10, steel=16, gold=24, diamond=40, netherite=60")
+				"A chest's total loot value is compared against these thresholds and it receives the highest tier it qualifies for.",
+				"If the value is below the lowest threshold, NO lock is generated for that chest.",
+				"Defaults: wood=3, copper=6, iron=10, steel=16, gold=24, diamond=40, netherite=60.",
+				"Example - make diamond (or better) locks exclusive to high-value chests: raise the diamond/netherite",
+				"thresholds (e.g. 80 and 140) so only the richest loot tables reach them, and raise the lowest threshold",
+				"to skip locks on poor chests. With [10, 20, 35, 50, 65, 80, 140] a chest worth 90 gets diamond and one",
+				"worth 150 gets netherite, while a chest worth 8 gets no lock at all.")
 			.defineList("Loot Value Tiers", Lists.newArrayList(3.0, 6.0, 10.0, 16.0, 24.0, 40.0, 60.0), e -> e instanceof Double);
-		LOOT_VALUE_SAMPLES = cfg
-			.comment("Number of times each loot table is sampled to compute its average value.",
-				"Higher values produce more consistent tier assignments across server restarts but slightly increase startup time.")
-			.defineInRange("Loot Value Samples", 32, 1, 256);
 		ITEM_VALUE_OVERRIDES = cfg
 			.comment("Override the base value for specific items. Format: 'modid:item_name=value'.",
 				"Items not listed here use the Default Item Value.",

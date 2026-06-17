@@ -169,7 +169,7 @@ public class Cuboid6i
 			T t = f.apply(x1 + a % sizeX, z1 + a / sizeX);
 			if(endEarly && t == null)
 				return null;
-			list.add(a, t);
+			list.add(t);
 		}
 		return list;
 	}

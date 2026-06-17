@@ -44,9 +44,31 @@ public class LocksServerConfig
 	public static final ForgeConfigSpec.BooleanValue ENABLE_REINFORCED;
 	public static final ForgeConfigSpec.BooleanValue ENABLE_AWARENESS;
 
+	// Shocking enchantment tuning
+	public static final ForgeConfigSpec.DoubleValue SHOCKING_DAMAGE_BASE;
+	public static final ForgeConfigSpec.DoubleValue SHOCKING_DAMAGE_PER_LEVEL;
+	public static final ForgeConfigSpec.DoubleValue SHOCKING_MAX_DAMAGE;
+	public static final ForgeConfigSpec.BooleanValue SHOCKING_REQUIRES_ENCHANTMENT;
+	public static final ForgeConfigSpec.IntValue SHOCKING_COOLDOWN_TICKS;
+	public static final ForgeConfigSpec.BooleanValue SHOCKING_ON_PICK_BREAK;
+	public static final ForgeConfigSpec.BooleanValue SHOCKING_ON_WRONG_PIN;
+	public static final ForgeConfigSpec.BooleanValue SHOCKING_ON_UNAUTHORIZED_INTERACTION;
+	public static final ForgeConfigSpec.BooleanValue SHOCKING_ON_BLOCK_BREAK_ATTEMPT;
+
 	public static final ForgeConfigSpec.BooleanValue NETHERITE_PICK_UNBREAKABLE;
 
 	public static final ForgeConfigSpec.ConfigValue<List<? extends String>> LOOT_TABLE_PATTERNS;
+
+	// Trades
+	public static final ForgeConfigSpec.BooleanValue ENABLE_VILLAGER_TRADES;
+	public static final ForgeConfigSpec.BooleanValue ENABLE_VILLAGER_LOCKPICK_TRADES;
+	public static final ForgeConfigSpec.BooleanValue ENABLE_VILLAGER_LOCK_TRADES;
+	public static final ForgeConfigSpec.BooleanValue ENABLE_VILLAGER_MECHANISM_TRADES;
+	public static final ForgeConfigSpec.ConfigValue<String> VILLAGER_PROFESSION;
+	public static final ForgeConfigSpec.BooleanValue ENABLE_WANDERER_TRADES;
+	public static final ForgeConfigSpec.BooleanValue ENABLE_WANDERER_LOCKPICK_TRADES;
+	public static final ForgeConfigSpec.BooleanValue ENABLE_WANDERER_LOCK_TRADES;
+	public static final ForgeConfigSpec.BooleanValue ENABLE_WANDERER_MECHANISM_TRADES;
 
 	public static Pattern[] lockableBlocks;
 	public static List<TagKey<Block>> lockableTags;
@@ -109,6 +131,41 @@ public class LocksServerConfig
 		ENABLE_AWARENESS = cfg
 			.comment("Remembers who placed the lock; that player can open it without a key")
 			.define("Enable Awareness", true);
+
+		cfg.comment("Tuning for the Shocking enchantment and the theft punishments it enables.",
+				"By default, Shocking deals 1.5 damage per enchantment level when a lock pick breaks.",
+				"Final damage = Damage Base + level * Damage Per Level, clamped to Max Damage.").push("Shocking");
+		SHOCKING_DAMAGE_BASE = cfg
+			.comment("Flat shock damage dealt regardless of enchantment level (2.0 = 1 heart).")
+			.defineInRange("Shocking Damage Base", 0.0d, 0.0d, 1024.0d);
+		SHOCKING_DAMAGE_PER_LEVEL = cfg
+			.comment("Shock damage added per level of the Shocking enchantment. Default 1.5 reproduces the original behavior (level * 1.5).")
+			.defineInRange("Shocking Damage Per Level", 1.5d, 0.0d, 1024.0d);
+		SHOCKING_MAX_DAMAGE = cfg
+			.comment("Upper clamp on shock damage after Base + level * Per Level. The default is effectively uncapped.")
+			.defineInRange("Shocking Max Damage", 1024.0d, 0.0d, 1024.0d);
+		SHOCKING_REQUIRES_ENCHANTMENT = cfg
+			.comment("If true, only locks that actually carry the Shocking enchantment can shock players.",
+				"If false, every lock shocks (treated as level 1 when unenchanted) — useful for punishing all theft attempts.")
+			.define("Shocking Requires Enchantment", true);
+		SHOCKING_COOLDOWN_TICKS = cfg
+			.comment("Minimum ticks between shocks dealt to the same player (20 ticks = 1 second). 0 = no cooldown (original behavior).",
+				"Raise this (e.g. to 20) when enabling the interaction or wrong-pin triggers below to avoid shock spam.")
+			.defineInRange("Shocking Cooldown Ticks", 0, 0, 72000);
+		SHOCKING_ON_PICK_BREAK = cfg
+			.comment("Shock the player when their lock pick breaks while picking. This is the original Shocking behavior.")
+			.define("Shocking Triggers On Pick Break", true);
+		SHOCKING_ON_WRONG_PIN = cfg
+			.comment("Shock the player each time they set a wrong pin while picking, even if the pick does not break.")
+			.define("Shocking Triggers On Wrong Pin", false);
+		SHOCKING_ON_UNAUTHORIZED_INTERACTION = cfg
+			.comment("Shock the player when they interact with a locked block without the correct key, lock pick or key ring (the 'rattle').")
+			.define("Shocking Triggers On Unauthorized Interaction", false);
+		SHOCKING_ON_BLOCK_BREAK_ATTEMPT = cfg
+			.comment("Shock the player when they attempt to break a protected locked block. Requires 'Protect Lockables' to be enabled.")
+			.define("Shocking Triggers On Block Break Attempt", false);
+		cfg.pop(); // Shocking
+
 		cfg.pop();
 
 		NETHERITE_PICK_UNBREAKABLE = cfg
@@ -120,6 +177,43 @@ public class LocksServerConfig
 				"Each entry is 'namespace:path_prefix' (e.g. 'minecraft:chests/' matches all vanilla chest loot tables).",
 				"Add entries for modded namespaces to inject lock picks into modded dungeon chests.")
 			.defineList("Loot Table Injection Patterns", Lists.newArrayList("minecraft:chests/"), e -> e instanceof String);
+
+		cfg.comment("Configure which lock-related items villagers and wandering traders sell.",
+				"Existing default trades are unchanged. Lock picks can be disabled independently of locks and mechanisms,",
+				"so you can remove easy lock picks while still letting players buy locks for early-game chest protection.").push("Trades");
+		cfg.push("Villager");
+		ENABLE_VILLAGER_TRADES = cfg
+			.comment("Master switch for all lock-related trades offered by the lock villager profession.")
+			.define("Enable Villager Trades", true);
+		ENABLE_VILLAGER_LOCKPICK_TRADES = cfg
+			.comment("Allow the lock villager to sell lock picks. Set this to false to remove lock pick sales (they can be considered overpowered) while keeping lock and mechanism sales.")
+			.define("Enable Villager Lockpick Trades", true);
+		ENABLE_VILLAGER_LOCK_TRADES = cfg
+			.comment("Allow the lock villager to sell finished locks (wood/copper/iron at trade levels 1-3).",
+				"Disabled by default — enable it to make early-game chest protection purchasable from villagers.")
+			.define("Enable Villager Lock Trades", false);
+		ENABLE_VILLAGER_MECHANISM_TRADES = cfg
+			.comment("Allow the lock villager to sell lock mechanisms (crafting components).")
+			.define("Enable Villager Lock Mechanism Trades", true);
+		VILLAGER_PROFESSION = cfg
+			.comment("Which villager profession offers lock trades. Format 'namespace:profession' (e.g. 'minecraft:toolsmith', 'minecraft:librarian').")
+			.define("Villager Profession", "minecraft:toolsmith");
+		cfg.pop(); // Villager
+		cfg.push("Wandering Trader");
+		ENABLE_WANDERER_TRADES = cfg
+			.comment("Master switch for all lock-related trades offered by the wandering trader.")
+			.define("Enable Wandering Trader Trades", true);
+		ENABLE_WANDERER_LOCKPICK_TRADES = cfg
+			.comment("Allow the wandering trader to sell lock picks (gold and steel).")
+			.define("Enable Wandering Trader Lockpick Trades", true);
+		ENABLE_WANDERER_LOCK_TRADES = cfg
+			.comment("Allow the wandering trader to sell finished, enchanted locks (steel/diamond/netherite).")
+			.define("Enable Wandering Trader Lock Trades", true);
+		ENABLE_WANDERER_MECHANISM_TRADES = cfg
+			.comment("Allow the wandering trader to sell lock mechanisms (steel).")
+			.define("Enable Wandering Trader Lock Mechanism Trades", true);
+		cfg.pop(); // Wandering Trader
+		cfg.pop(); // Trades
 
 		SPEC = cfg.build();
 	}

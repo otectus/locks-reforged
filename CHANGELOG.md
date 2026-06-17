@@ -1,5 +1,34 @@
 # Locks Reforged Changelog
 
+## 1.6.0
+
+### C2ME / Async Chunk Compatibility
+- Fixed a crash (`ArrayIndexOutOfBoundsException` in `LevelChunk`) when running alongside C2ME (Concurrent Chunk Management Engine) or other mods that load/generate chunks on parallel threads (issue #10). The `LevelChunk` constructor mixin was mutating the world-global lockable handler map, registering observers, and sending packets directly from the (now off-thread) constructor, corrupting the non-thread-safe handler map.
+- Lockable handler mutation and packet sync from chunk and structure code paths are now funneled onto the main server thread. Without an async chunk mod this work still runs inline on the server thread, so behavior is unchanged; under C2ME it is deferred to the next server tick. A one-time log line notes when compatibility deferral first activates.
+- Hardened `LootValueCalculator`'s value cache (now a `ConcurrentHashMap`) against concurrent writes from world-generation worker threads, and snapshotted lockable collections before iterating in the chunk-watch and structure-copy paths to avoid `ConcurrentModificationException`.
+
+### Shocking — Configurable Damage & Theft Punishments
+- The Shocking enchantment's damage is no longer hardcoded. New server config (under **Enchantments > Shocking**): **Shocking Damage Base** (default 0.0), **Shocking Damage Per Level** (default 1.5), **Shocking Max Damage** (default 1024.0), **Shocking Requires Enchantment** (default true), and **Shocking Cooldown Ticks** (default 0). The default formula is unchanged: **1.5 damage per enchantment level when a lock pick breaks**.
+- New opt-in theft punishments (all default **off**, preserving existing behavior): **Shocking Triggers On Wrong Pin**, **Shocking Triggers On Unauthorized Interaction** (interacting with a locked block without a key), and **Shocking Triggers On Block Break Attempt** (trying to break a protected locked block). The original pick-break shock remains **on** by default. Creative players remain exempt; raising the cooldown is recommended when enabling the interaction triggers.
+
+### Configurable Trades
+- Villager and wandering trader lock trades are now configurable (under **Trades**). Lock picks, locks, and lock mechanisms can each be toggled independently for villagers and the wandering trader, so you can disable easy lock picks while still selling locks (or vice versa).
+- The lock villager profession is configurable via **Villager Profession** (default `minecraft:toolsmith`).
+- Added optional, default-**off** early-game villager lock sales (wood/copper/iron locks at trade levels 1-3) via **Enable Villager Lock Trades**, so `Enable Villager Lockpick Trades = false` + `Enable Villager Lock Trades = true` removes lock picks while letting players buy locks for chest protection. All existing default trades are unchanged when the config is left at defaults.
+
+### Loot-Scaled Locks (hardening + docs)
+- Removed the unused **Loot Value Samples** config option (the loot-value estimator is deterministic, so it was never read).
+- Expanded the **Loot Value Tiers** documentation with a worked example for making diamond/netherite locks exclusive to high-value chests. The existing system already supports this: chests below the lowest threshold get no lock, and higher loot values map to higher lock tiers.
+
+### Curios Key Ring Behavior
+- A key ring worn in a Curios slot now only unlocks/relocks a lock when the player is actually aiming at the lock model, instead of toggling on any right-click of the host block. This stops a worn key ring from instantly re-locking a door or chest the moment you try to open it. Held keys, held key rings, master keys, lock picks, the Awareness enchantment, and the shift-empty-hand Curios key ring screen are unaffected.
+
+### Bug Fixes & Hardening
+- Fixed a potential client `NullPointerException` when a lock-state update packet (`UpdateLockablePacket`) arrived while the client level was still null (world load/unload/disconnect); it now guards the level like the other lockable packets.
+- Fixed a lock that straddles a chunk boundary disappearing from rendering and stopping its lock/unlock sync when only one of its chunks unloaded. On chunk unload, a lockable is now kept in the handler until none of the chunks it occupies remain loaded.
+- Capability providers now invalidate their `LazyOptional` when detached (chunk/level unload, player logout), following the standard Forge pattern.
+- Minor cleanup in `Cuboid6i.containedChunksTo` (append instead of index-insert) and an aligned fastutil default-value check in `UpdateLockablePacket`.
+
 ## 1.5.4
 
 ### Bug Fixes

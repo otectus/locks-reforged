@@ -23,4 +23,10 @@ public class CapabilityProvider<A> implements ICapabilityProvider
 	{
 		return cap == this.cap ? this.opt.cast() : LazyOptional.empty();
 	}
+
+	// Invalidate the held LazyOptional when the holder is detached (chunk unload, logout, etc.)
+	public void invalidate()
+	{
+		this.opt.invalidate();
+	}
 }
