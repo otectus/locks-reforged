@@ -4,12 +4,13 @@ import java.util.function.Supplier;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import melonslise.locks.common.capability.ILockableHandler;
-import melonslise.locks.common.capability.ILockableStorage;
 import melonslise.locks.common.init.LocksCapabilities;
 import melonslise.locks.common.util.Lockable;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.ChunkStatus;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraftforge.network.NetworkEvent;
 
@@ -58,19 +59,26 @@ public class AddLockableToChunkPacket
 				Minecraft mc = Minecraft.getInstance();
 				if(mc.level == null)
 					return;
-				ILockableStorage st = mc.level.getChunk(pkt.x, pkt.z).getCapability(LocksCapabilities.LOCKABLE_STORAGE).orElse(null);
 				ILockableHandler handler = mc.level.getCapability(LocksCapabilities.LOCKABLE_HANDLER).orElse(null);
-				if(st == null || handler == null)
+				if(handler == null)
 					return;
+				// The world handler is the client's authoritative render source, so always register here.
 				Int2ObjectMap<Lockable> lkbs = handler.getLoaded();
-				Lockable lkb = lkbs.get(pkt.lockable.id);
-				if(lkb == lkbs.defaultReturnValue())
+				Lockable existing = lkbs.get(pkt.lockable.id);
+				final Lockable lkb;
+				if(existing == lkbs.defaultReturnValue())
 				{
 					lkb = pkt.lockable;
 					lkb.addObserver(handler);
 					lkbs.put(lkb.id, lkb);
 				}
-				st.add(lkb);
+				else
+					lkb = existing;
+				// Best-effort: add to the chunk's storage only if it is already loaded. NEVER force-load the
+				// chunk (mc.level.getChunk(x, z) would create one, corrupting the client chunk lifecycle).
+				ChunkAccess ca = mc.level.getChunk(pkt.x, pkt.z, ChunkStatus.FULL, false);
+				if(ca instanceof LevelChunk ch)
+					ch.getCapability(LocksCapabilities.LOCKABLE_STORAGE).ifPresent(st -> st.add(lkb));
 			}
 		});
 		ctx.get().setPacketHandled(true);

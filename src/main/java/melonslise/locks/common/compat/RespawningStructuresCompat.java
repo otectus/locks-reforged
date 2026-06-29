@@ -100,7 +100,11 @@ public final class RespawningStructuresCompat
 		// 1. Clear lockables overlapping the freshly re-placed structure. The chests they referenced
 		// were just replaced, so the old lockables are stale; removing them also frees the space so
 		// the re-lock pass below isn't rejected by handler.add's overlap check.
-		for(Lockable lkb : new ArrayList<>(handler.getLoaded().values()))
+		// handler.remove force-loads each lockable's chunks and clears it from every chunk's storage (not just
+		// loaded ones), so a stale copy in a structure chunk that happens to be unloaded cannot survive and be
+		// resurrected on reload -> no duplicate locks after repeated respawns. getLoaded() here is the world
+		// index, which the interaction-time reconcile keeps consistent with chunk storage.
+		for(Lockable lkb : handler.snapshotLoaded())
 			if(lkb.bb.intersects(region))
 				handler.remove(lkb.id);
 

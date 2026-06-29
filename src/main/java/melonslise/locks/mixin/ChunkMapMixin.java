@@ -1,7 +1,5 @@
 package melonslise.locks.mixin;
 
-import java.util.ArrayList;
-
 import org.apache.commons.lang3.mutable.MutableObject;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -28,7 +26,7 @@ public class ChunkMapMixin
 		{
 			// Snapshot the lockables so iteration can't throw ConcurrentModificationException if the
 			// handler/storage is mutated on another path while this player is being synced.
-			for(Lockable lkb : new ArrayList<>(st.get().values()))
+			for(Lockable lkb : st.snapshot())
 				LocksNetwork.MAIN.send(PacketDistributor.PLAYER.with(() -> player), new AddLockableToChunkPacket(lkb, ch));
 		});
 	}

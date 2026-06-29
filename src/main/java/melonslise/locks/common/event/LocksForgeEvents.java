@@ -9,6 +9,7 @@ import com.google.gson.JsonElement;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import melonslise.locks.Locks;
 import melonslise.locks.common.capability.ILockableHandler;
+import melonslise.locks.common.capability.ILockableStorage;
 import melonslise.locks.common.capability.ISelection;
 import melonslise.locks.common.compat.CuriosHelper;
 import melonslise.locks.common.init.LocksEnchantments;
@@ -19,6 +20,8 @@ import melonslise.locks.common.container.LockPickingContainer;
 import melonslise.locks.common.init.LocksCapabilities;
 import melonslise.locks.common.init.LocksItemTags;
 import melonslise.locks.common.init.LocksItems;
+import melonslise.locks.common.init.LocksNetwork;
+import melonslise.locks.common.network.toclient.AddLockableToChunkPacket;
 import melonslise.locks.common.init.LocksTagHelper;
 import melonslise.locks.common.init.LockStatsReloadListener;
 import melonslise.locks.common.init.LocksSoundEvents;
@@ -27,6 +30,7 @@ import melonslise.locks.common.item.LockItem;
 import melonslise.locks.common.item.LockPickItem;
 import melonslise.locks.common.item.LockingItem;
 import melonslise.locks.common.util.Lockable;
+import melonslise.locks.common.util.LocksThreadUtil;
 import melonslise.locks.common.util.LocksUtil;
 import melonslise.locks.common.util.LootValueCalculator;
 import melonslise.locks.common.util.ShockingHelper;
@@ -62,6 +66,7 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.TickEvent.Phase;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
+import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.event.village.VillagerTradesEvent;
 import net.minecraftforge.event.village.WandererTradesEvent;
 import net.minecraftforge.event.level.BlockEvent;
@@ -111,8 +116,14 @@ public final class LocksForgeEvents
 	@SubscribeEvent
 	public static void onLevelLoad(LevelEvent.Load e)
 	{
-		if (e.getLevel() instanceof ServerLevel level && level.dimension() == Level.OVERWORLD)
-			LootValueCalculator.precomputeAll(level.getServer());
+		if (e.getLevel() instanceof ServerLevel level)
+		{
+			// Resolve the persisted lockable id counter on the main thread before any chunk/structure
+			// generation can allocate ids off-thread (C2ME), keeping ids unique across server restarts.
+			level.getCapability(LocksCapabilities.LOCKABLE_HANDLER).ifPresent(ILockableHandler::initIds);
+			if (level.dimension() == Level.OVERWORLD)
+				LootValueCalculator.precomputeAll(level.getServer());
+		}
 	}
 
 	@SubscribeEvent
@@ -220,30 +231,67 @@ public final class LocksForgeEvents
 			rare.add(new VillagerTrades.ItemsForEmeralds(LocksItems.STEEL_LOCK_MECHANISM.get(), 6, 1, 4, 1));
 	}
 
+	// Single registration trigger for ALL chunk loads (disk + freshly generated). The chunk capability NBT
+	// (LockableStorage#deserializeNBT) is now pure chunk-local parsing that may run on an async worker thread
+	// (C2ME); moving the parsed lockables into the world-global handler is main-thread-only work, so it is
+	// deferred here. Without async chunk mods this runs inline and behaviour is unchanged.
+	@SubscribeEvent
+	public static void onChunkLoad(ChunkEvent.Load e)
+	{
+		if(!(e.getChunk() instanceof LevelChunk ch))
+			return;
+		Level level = ch.getLevel();
+		if(level.isClientSide)
+			return; // the client populates its handler from packets, not chunk NBT
+		// `ch` IS the live LevelChunk whose load fired this event, and its LockableStorage was already populated by
+		// LevelChunkMixin on the building thread. Capture both NOW and NEVER re-fetch via a blocking Level#getChunk:
+		// under C2ME this handler can fire re-entrantly on the main thread while that thread is draining the chunk
+		// executor (BlockableEventLoop#managedBlock), and getChunk(...,FULL,true) would re-park on the very future
+		// this thread is in the middle of completing -> permanent hang.
+		ILockableStorage storage = ch.getCapability(LocksCapabilities.LOCKABLE_STORAGE).orElse(null);
+		if(storage == null)
+			return;
+		int chX = ch.getPos().x, chZ = ch.getPos().z;
+		LocksThreadUtil.runOnServerThread(level.getServer(), () ->
+		{
+			// Non-blocking staleness guard for the deferred (worker -> next-tick) path: the chunk may have unloaded
+			// before this task runs. hasChunk == ServerChunkCache#getChunkNow != null (no future await). NEVER call
+			// level.getChunk(...) here.
+			if(!level.hasChunk(chX, chZ))
+				return;
+			ILockableHandler handler = level.getCapability(LocksCapabilities.LOCKABLE_HANDLER).orElse(null);
+			if(handler == null)
+				return;
+			handler.registerChunkStorage(ch, storage, false);
+		});
+	}
+
 	@SubscribeEvent
 	public static void onChunkUnload(ChunkEvent.Unload e)
 	{
 		if(!(e.getChunk() instanceof LevelChunk ch))
 			return;
-		ILockableHandler handler = ch.getLevel().getCapability(LocksCapabilities.LOCKABLE_HANDLER).orElse(null);
+		Level level = ch.getLevel();
+		ILockableHandler handler = level.getCapability(LocksCapabilities.LOCKABLE_HANDLER).orElse(null);
 		if(handler == null)
 			return;
+		ILockableStorage storage = ch.getCapability(LocksCapabilities.LOCKABLE_STORAGE).orElse(null);
+		if(storage == null)
+			return;
+		// Snapshot the storage now: reading the per-chunk map is thread-safe, but the handler mutation must
+		// happen on the main thread, and the storage capability may be invalidated by the time a deferred task
+		// runs. A lockable straddling a chunk border is only dropped from the handler once no OTHER chunk it
+		// occupies is still loaded — otherwise it vanishes from rendering/sync while a neighbour stays loaded.
+		List<Lockable> present = new ArrayList<>(storage.get().values());
+		if(present.isEmpty())
+			return;
 		int chX = ch.getPos().x, chZ = ch.getPos().z;
-		Level level = ch.getLevel();
-		ch.getCapability(LocksCapabilities.LOCKABLE_STORAGE).ifPresent(storage -> storage.get().values().forEach(lkb ->
+		if(level.isClientSide)
 		{
-			// A lockable straddling a chunk border lives in multiple chunk storages but only once
-			// in the handler. Only drop it from the handler (and stop observing it) once no other
-			// chunk it occupies is still loaded — otherwise it vanishes from rendering/sync while
-			// a neighbouring chunk that still contains it stays loaded.
-			boolean anyOtherLoaded = !lkb.bb.getContainedChunks((x, z) ->
-				!(x == chX && z == chZ) && level.hasChunk(x, z));
-			if(!anyOtherLoaded)
-			{
-				handler.getLoaded().remove(lkb.id);
-				lkb.deleteObserver(handler);
-			}
-		}));
+			handler.unregisterChunkStorage(chX, chZ, present); // no server thread to defer to client-side
+			return;
+		}
+		LocksThreadUtil.runOnServerThread(level.getServer(), () -> handler.unregisterChunkStorage(chX, chZ, present));
 	}
 
 	@SubscribeEvent
@@ -262,6 +310,27 @@ public final class LocksForgeEvents
 		for(Lockable lkb : chunkLockables.values())
 			if(lkb.bb.intersects(pos))
 				intersect.add(lkb);
+		// Self-heal a chunk-storage <-> world-index divergence before acting on a lock (server only, and only when
+		// a lockable is actually here). Door-blocking reads the per-chunk storage, but rendering and the pick
+		// minigame read the world index / client mirror. registerChunkStorage is idempotent and sends no packets;
+		// it makes every lockable in this chunk the canonical, handler-observed instance (so lock-state changes
+		// persist and sync), then we rebuild `intersect` from the now-canonical storage so we operate on those
+		// instances. Without this a door could stay blocked by a lock that never reached the index (e.g. a missed
+		// sync under async chunk loading), invisible and unpickable.
+		LevelChunk lockChunk = null;
+		if(!world.isClientSide && !intersect.isEmpty())
+		{
+			lockChunk = world.getChunkAt(pos);
+			ILockableStorage st = lockChunk.getCapability(LocksCapabilities.LOCKABLE_STORAGE).orElse(null);
+			if(st != null)
+			{
+				handler.registerChunkStorage(lockChunk, st, false);
+				intersect.clear();
+				for(Lockable lkb : chunkLockables.values())
+					if(lkb.bb.intersects(pos))
+						intersect.add(lkb);
+			}
+		}
 		if(intersect.isEmpty())
 		{
 			// Adventure mode fallback: vanilla ItemStack.useOn() short-circuits when
@@ -300,6 +369,14 @@ public final class LocksForgeEvents
 			Lockable lkb = locked;
 			e.setUseBlock(Event.Result.DENY);
 			e.setUseItem(Event.Result.DENY);
+
+			// Self-heal the client: push the blocking lock to the interacting player so a desynced or missing
+			// client copy re-renders and the pick minigame can resolve it. Bounded to actual blocked interactions.
+			if(!world.isClientSide && lockChunk != null && player instanceof ServerPlayer sp)
+			{
+				LevelChunk syncChunk = lockChunk;
+				LocksNetwork.MAIN.send(PacketDistributor.PLAYER.with(() -> sp), new AddLockableToChunkPacket(lkb, syncChunk));
+			}
 
 			if(LocksTagHelper.isLockPick(stack))
 			{

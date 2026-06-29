@@ -1,5 +1,55 @@
 # Locks Reforged Changelog
 
+## 1.6.4
+
+### C2ME / Async Chunk — the world-load HANG (re-entrant blocking chunk fetch)
+- Fixed a hard hang (no crash, no exception — the game freezes during initial world generation) under C2ME. The Server thread, while blocked awaiting a spawn chunk, is made by C2ME's `beforeAwaitChunk` redirect to **drain the chunk executor** (`managedBlock`); a chunk-load completion fires `ChunkEvent.Load` **re-entrantly on that same thread**. Our `onChunkLoad` handler ran inline (it was already "on the server thread") and called a **blocking** `Level#getChunk(x, z)` to re-fetch the chunk — which re-parks on the very chunk future the thread is mid-completing. Permanent self-deadlock.
+- `onChunkLoad` now uses the live `LevelChunk` the event already provides (the blocking re-fetch was redundant) and keeps only a **non-blocking** `hasChunk` staleness guard. `registerChunkStorage` is a leaf-`mutex` map put with no chunk fetch, so running it inline during the drain is safe.
+- Hardened `LocksThreadUtil.runOnServerThread` with a hard contract that deferred work must never perform a blocking chunk fetch, and made the `server == null` branch degrade safely (run inline only on the owning thread, otherwise drop + warn-once) instead of mutating the global handler off-thread.
+- Replaced every `hasChunk`-guarded **blocking** `getChunk`/`getChunkAt` in `LockableHandler` (`add`, `addDirect`, `getInChunk`, `markDirty`, `update`) with the non-blocking `getChunkSource().getChunkNow(x, z)`. Behaviour-preserving on the main thread; removes the same latent re-entrant-hang surface (including the path reached by `StructureTemplate#placeInWorld`'s deferred `add`).
+
+### C2ME correctness hardening
+- **Border-spanning generated locks no longer silently dropped.** When `LockChestsFeature` adds a lock to a neighbour the worldgen region returns as an already-finished `ImposterProtoChunk`, the lock previously landed in an inherited `ProtoChunk` list that nothing drains. It is now written through to the wrapped `LevelChunk`'s storage and registered with the world handler on the main thread.
+- **Per-chunk `LockableStorage` is now thread-safe.** Its fastutil map is written on C2ME worker threads (`deserializeNBT`, the `LevelChunk` drain) and read on the main thread; all mutations and a new `snapshot()` copy are guarded by the storage monitor, giving an explicit happens-before edge (used by `registerChunkStorage` and `ChunkMapMixin`).
+- Added a one-time diagnostic warning if `nextId()` allocates off-thread before the persisted counter is bootstrapped (`initIds`), so any future ordering regression is observable; the existing `advanceLastId` backstop still reconciles ids on chunk load.
+
+### Build
+- Fixed the recurring **mislabeled jar** bug: `processResources` did not track `mod_version` as an input, so it stayed UP-TO-DATE and baked a stale version into `mods.toml` even as the jar filename updated (e.g. a "1.6.3" jar internally reporting 1.6.2). Added `inputs.property 'mod_version'` so the embedded version always matches the release.
+
+## 1.6.3
+
+### C2ME / Async Chunk — the *remaining* crash (off-thread read of the handler map)
+- Fixed an `ArrayIndexOutOfBoundsException` (same `Index -1` signature as the 1.6.2 crash, now on the **read** side) that could still occur under C2ME. `StructureTemplate#fillFromWorld` (our mixin) runs on a C2ME worker thread and was copying the world-global `LockableHandler.lockables` map (`new ArrayList<>(handler.getLoaded().values())`). The 1.6.x fixes serialized all *writes* to that map onto the main thread, but **building a snapshot of a fastutil open-addressing map while the main thread rehashes it still reads a torn backing array** — the copy itself crashes. A plain snapshot does not make a concurrent read safe.
+- `LockableHandler` now guards every structural mutation of its map with an internal monitor and exposes `snapshotLoaded()`, a synchronized copy used by `fillFromWorld` (and the Respawning Structures compat). No behavior change on the main thread or without C2ME; we only serialize the rare worker-thread read against main-thread writes.
+- Also closed a lower-probability worldgen race: a border-spanning generated lock is appended to **neighbouring** `ProtoChunk` lock lists from `LockChestsFeature` on worldgen worker threads. That list is now synchronized and is drained under its monitor when the chunk converts to a `LevelChunk`.
+
+### Ghost-locked doors — a door could stay blocked with no visible, pickable lock
+- Root cause: two stores must mirror each other — the per-chunk `LockableStorage` (read by **door-blocking** via `getInChunk`) and the world-global `LockableHandler` index (read by **rendering** and the **lock-picking minigame**, including the client). When they diverged (e.g. a missed sync under async chunk loading), a door blocked authoritatively while its lock was invisible and could not be picked — and force-loading the chunk didn't help because the chunk was already loaded.
+- **Self-healing reconcile at interaction time (server-authoritative).** When a player interacts with a block that has lockables, the server now re-registers that chunk's storage into the world index (idempotent, no extra packets) so every lock that can block a door is the canonical, observed instance — guaranteeing its lock/unlock changes persist and sync. When a lock actually blocks the interaction, the server also pushes it to the interacting player so a desynced or missing client copy re-renders and becomes pickable. A door can no longer be permanently blocked by a lock the player cannot see or pick.
+- **Lock-picking no longer dead-ends on a sync race.** The open-screen packet now carries the full lockable instead of just its id, so the client reconstructs it directly instead of failing with "Lockable not found" when its loaded map hasn't caught up. The pin order stays server-authoritative (the network form is lossy on it). The client still prefers its already-loaded instance when present.
+
+### No more resurrected / duplicate locks across chunk reloads
+- `LockableHandler.remove` previously skipped chunks of a multi-chunk lockable that were unloaded, leaving a stale copy on disk that `registerChunkStorage` resurrected as canonical on reload (a removed lock reappearing, or a duplicate after a structure respawn). On the server it now force-loads each chunk the lockable spans (they already exist on disk — this loads, it does not generate) and clears the lock from all of them. The client path stays best-effort and never force-loads.
+
+### Respawning Structures — preserved and hardened
+- No behavioral change to the respawn re-lock flow; it still runs on the server thread and reuses the exact world-generation rules (`LocksUtil.createChestLockable`). It now benefits directly from the fixes above: the stale-lock clear uses the thread-safe `snapshotLoaded()`, and `remove` clearing every chunk copy means repeated respawns can't accumulate duplicate locks.
+
+### Tests
+- Added a JUnit source set (`src/test`) covering the bootstrap-free pure logic: `Cuboid6i` geometry and chunk-span math (including negative coordinates and border spanning), `Lock` combo/locked NBT round-trips plus the seed-regeneration backward-compat path, and `LockableHandler`'s id-counter monotonicity (the guarantee that prevents id-reuse resurrection). Run with `./gradlew test`.
+
+## 1.6.2
+
+### C2ME / Async Chunk — the remaining crash (chunk capability deserialization)
+- Fixed a crash (`ArrayIndexOutOfBoundsException: Index -1 out of bounds for length 33` in `LockableStorage.deserializeNBT`, e.g. `Couldn't load chunk [97, -71]`) still present in 1.6.1 under C2ME / async chunk loading. The 1.6.0 fix funneled the `LevelChunk` constructor and structure mixins onto the main thread but **missed the chunk capability deserialization path**: Forge reads each chunk's `LockableStorage` NBT on C2ME worker threads, and that code was mutating the world-global, non-thread-safe `LockableHandler` map (and registering observers) directly off-thread.
+- `LockableStorage.deserializeNBT` is now **pure chunk-local NBT parsing**: it only hydrates that chunk's own storage, never touches the world handler, observers, packets, or the chunk's level, and makes no thread assumptions. Registration of a chunk's lockables into the world handler now happens on the main server thread via a single new path, `LockableHandler.registerChunkStorage`, driven by `ChunkEvent.Load` (inline without async chunk mods, deferred to the next tick under C2ME). Chunk unload bookkeeping is likewise routed onto the main thread.
+
+### Locks no longer disappear after chunk unload/reload or server restart
+- **ID collision across restarts (primary cause).** The lockable id counter (`lastId`) lives on the `LockableHandler`, which is a **Level capability** — and Forge does not persist Level capabilities, so the counter reset to `0` on every server restart. Newly placed locks then reused ids belonging to already-saved locks in unloaded chunks; when an old chunk reloaded, the by-id merge made the old lock adopt the new lock's object and position, so it rendered in the wrong place or vanished. The counter is now persisted per-level via `SavedData` (`LocksSavedData`) and is also advanced to the maximum id seen when chunks register, keeping lock ids globally unique across restarts. It is resolved early on the main thread (`LevelEvent.Load`) so ids stay correct even when structure generation allocates them off-thread under C2ME.
+- **Chunk-border identity.** When a lockable spans multiple chunks, whichever chunk loads first now provides the single canonical runtime instance, and later-loading chunks are pointed at it — so a stale chunk copy can never overwrite live lock state, regardless of the order adjacent chunks load or unload.
+- **Lock-state persistence.** Changing a lock's state (lock/unlock, combo reshuffle, etc.) now marks **every** loaded chunk the lockable occupies as unsaved, not just the one that triggered the change. Previously the state update only synced to clients and could fail to persist across a save/restart.
+- **Client force-load.** The client handler for `AddLockableToChunkPacket` no longer calls `mc.level.getChunk(x, z)`, which force-created a client chunk if it wasn't loaded yet. It now registers the lockable into the client's world handler (the render source) and only touches chunk storage when the chunk is already loaded, via a non-forcing lookup.
+- Chunk NBT loading is now defensive: a malformed lockable entry (missing/invalid bounding box, empty lock stack, or any parse error) is skipped with a warning naming the chunk and id, instead of aborting the whole chunk load.
+
 ## 1.6.1
 
 ### Respawning Structures Compatibility

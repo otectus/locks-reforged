@@ -215,13 +215,18 @@ public class LockPickingContainer extends AbstractContainerMenu
 	public static final IContainerFactory<LockPickingContainer> FACTORY = (id, inv, buf) ->
 	{
 		InteractionHand hand = buf.readEnum(InteractionHand.class);
-		int lockableId = buf.readInt();
+		Lockable received = Lockable.fromBuf(buf);
+		// Prefer the client's already-loaded instance (keeps the picked lock and the rendered lock the same
+		// object), but fall back to the reconstructed one if the client hasn't loaded it yet — so the minigame
+		// never dead-ends on a sync race.
 		ILockableHandler handler = inv.player.level().getCapability(LocksCapabilities.LOCKABLE_HANDLER).orElse(null);
-		if(handler == null)
-			throw new IllegalStateException("Lockable handler capability missing");
-		Lockable lkb = handler.getLoaded().get(lockableId);
-		if(lkb == handler.getLoaded().defaultReturnValue())
-			throw new IllegalStateException("Lockable " + lockableId + " not found");
+		Lockable lkb = received;
+		if(handler != null)
+		{
+			Lockable existing = handler.getLoaded().get(received.id);
+			if(existing != handler.getLoaded().defaultReturnValue())
+				lkb = existing;
+		}
 		return new LockPickingContainer(id, inv.player, hand, lkb);
 	};
 
@@ -240,7 +245,11 @@ public class LockPickingContainer extends AbstractContainerMenu
 		public void accept(FriendlyByteBuf buf)
 		{
 			buf.writeEnum(this.hand);
-			buf.writeInt(this.lockable.id);
+			// Write the FULL lockable, not just its id. The client opens this screen from a vanilla menu packet
+			// that can race ahead of our lock-sync packets, so resolving by id against the client's loaded map
+			// could miss and dead-end the minigame ("Lockable not found"). Sending the lockable lets the client
+			// reconstruct it directly; the pin order stays server-authoritative (Lockable.toBuf is lossy on it).
+			Lockable.toBuf(buf, this.lockable);
 		}
 	}
 

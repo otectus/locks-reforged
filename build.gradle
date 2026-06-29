@@ -76,6 +76,10 @@ minecraft {
 }
 
 processResources {
+    // Track mod_version as a task input so changing the version in gradle.properties invalidates this task.
+    // Without this, `expand` does not register the property as an input and processResources stays UP-TO-DATE,
+    // baking a stale version into mods.toml even though the jar filename updates (the recurring mislabel bug).
+    inputs.property 'mod_version', project.mod_version
     filesMatching('META-INF/mods.toml') {
         expand 'mod_version': project.mod_version
     }
@@ -88,6 +92,7 @@ repositories {
         name = "Illusive Soulworks"
         url = "https://maven.theillusivec4.top/"
     }
+    mavenCentral()
 }
 
 dependencies {
@@ -95,6 +100,16 @@ dependencies {
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
     compileOnly fg.deobf("top.theillusivec4.curios:curios-forge:5.14.1+1.20.1:api")
     runtimeOnly fg.deobf("top.theillusivec4.curios:curios-forge:5.14.1+1.20.1")
+
+    // Unit tests for pure logic (geometry, NBT round-trips, id counter). testImplementation extends
+    // implementation, so the deobfuscated Minecraft classpath is available — sufficient for the plain data
+    // classes these tests touch (BlockPos, CompoundTag, byte arrays); no FML/Bootstrap launch required.
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
 }
 
 mixin {

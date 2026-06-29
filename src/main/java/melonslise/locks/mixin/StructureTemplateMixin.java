@@ -55,9 +55,11 @@ public class StructureTemplateMixin
 			if(handler == null)
 				return;
 			Cuboid6i bb = new Cuboid6i(start, start.offset(size.getX() - 1, size.getY() - 1, size.getZ() - 1));
-			// Snapshot the handler's lockables before iterating to avoid ConcurrentModificationException
-			// if the handler is mutated on another path (relevant under async chunk mods like C2ME).
-			for(Lockable lkb : new ArrayList<>(handler.getLoaded().values()))
+			// fillFromWorld can run on a C2ME worker thread. Use the handler's synchronized snapshot rather than
+			// copying getLoaded() directly: building a copy of the fastutil map while the main thread rehashes it
+			// reads a torn backing array -> ArrayIndexOutOfBoundsException ("Index -1"). snapshotLoaded() takes
+			// the handler's monitor so the read is consistent with concurrent main-thread mutations.
+			for(Lockable lkb : handler.snapshotLoaded())
 			{
 				if(!lkb.bb.intersects(bb))
 					continue;

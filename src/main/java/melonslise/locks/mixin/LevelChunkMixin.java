@@ -8,18 +8,13 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import melonslise.locks.common.capability.ILockableHandler;
 import melonslise.locks.common.capability.ILockableStorage;
 import melonslise.locks.common.init.LocksCapabilities;
-import melonslise.locks.common.init.LocksNetwork;
-import melonslise.locks.common.network.toclient.AddLockableToChunkPacket;
 import melonslise.locks.common.util.ILockableProvider;
 import melonslise.locks.common.util.Lockable;
-import melonslise.locks.common.util.LocksThreadUtil;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.ProtoChunk;
-import net.minecraftforge.network.PacketDistributor;
 
 @Mixin(LevelChunk.class)
 public class LevelChunkMixin
@@ -28,30 +23,26 @@ public class LevelChunkMixin
 	private void init(ServerLevel world, ProtoChunk pr, LevelChunk.PostLoadProcessor proc, CallbackInfo ci)
 	{
 		LevelChunk ch = (LevelChunk) (Object) this;
-		List<Lockable> provided = ((ILockableProvider) pr).getLockables();
-		if(provided.isEmpty())
-			return;
-		// Copy now: under async chunk mods (e.g. C2ME) the registration below is deferred to the next
-		// server tick, by which point the ProtoChunk's list must not be read again.
-		List<Lockable> toAdd = new ArrayList<>(provided);
-		// Mutating the world-global handler map, registering observers and sending packets are all
-		// main-thread-only. Without C2ME this constructor already runs on the server thread, so the work
-		// executes inline and behavior is unchanged; under C2ME it is deferred to avoid corrupting the
-		// non-thread-safe handler map (issue #10: ArrayIndexOutOfBoundsException in LevelChunk).
-		LocksThreadUtil.runOnServerThread(world.getServer(), () ->
+		List<Lockable> source = ((ILockableProvider) pr).getLockables();
+		// The source is a synchronized list that worldgen workers may still be appending to (border-spanning
+		// locks from neighbouring chunks). Copy it under its monitor so the drain below sees a stable view.
+		List<Lockable> provided;
+		synchronized(source)
 		{
-			ILockableStorage st = ch.getCapability(LocksCapabilities.LOCKABLE_STORAGE).orElse(null);
-			ILockableHandler handler = world.getCapability(LocksCapabilities.LOCKABLE_HANDLER).orElse(null);
-			if(st == null || handler == null)
+			if(source.isEmpty())
 				return;
-			// We trust that all checks pass (such as volume and intersect checks) due to this happening only during world gen
-			for(Lockable lkb : toAdd)
-			{
-				st.add(lkb);
-				handler.getLoaded().put(lkb.id, lkb);
-				lkb.addObserver(handler);
-				LocksNetwork.MAIN.send(PacketDistributor.TRACKING_CHUNK.with(() -> ch), new AddLockableToChunkPacket(lkb, ch));
-			}
-		});
+			provided = new ArrayList<>(source);
+		}
+		ILockableStorage st = ch.getCapability(LocksCapabilities.LOCKABLE_STORAGE).orElse(null);
+		if(st == null)
+			return;
+		// Populate the per-chunk storage synchronously. This map belongs to a freshly built chunk that no
+		// other thread references yet, so it is safe even under async chunk mods (C2ME). It MUST be populated
+		// before the chunk goes full, so playerLoadedChunk and the ChunkEvent.Load registrar see the data.
+		// Mutating the world-global handler map, registering observers and sending packets are all
+		// main-thread-only and are handled later by LockableHandler#registerChunkStorage (driven by
+		// ChunkEvent.Load), which reads this now-populated storage.
+		for(Lockable lkb : provided)
+			st.add(lkb);
 	}
 }

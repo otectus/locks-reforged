@@ -29,16 +29,15 @@ public class ChestPlacement extends PlacementModifier
 	{
 		var chunk = context.getLevel().getChunk(pos);
 		var allBEPos = chunk.getBlockEntitiesPos();
-		Locks.LOGGER.debug("ChestPlacement: chunk {} has {} block entities (chunk type: {})", chunk.getPos(), allBEPos.size(), chunk.getClass().getSimpleName());
+		// Most chunks have no block entities — skip building the filter stream entirely.
+		if (allBEPos.isEmpty())
+			return Stream.empty();
 		return allBEPos.stream()
 			.filter(tePos ->
 			{
 				BlockState state = context.getLevel().getBlockState(tePos);
 				if (!state.hasProperty(ChestBlock.TYPE))
-				{
-					Locks.LOGGER.debug("ChestPlacement: skipping {} — block {} has no ChestBlock.TYPE", tePos, state.getBlock());
 					return false;
-				}
 				if (state.getValue(ChestBlock.TYPE) == ChestType.RIGHT && !ModList.get().isLoaded("lootr"))
 					return false;
 				BlockEntity be = context.getLevel().getBlockEntity(tePos);
@@ -48,18 +47,9 @@ public class ChestPlacement extends PlacementModifier
 					return false;
 				}
 				if (!(be instanceof RandomizableContainerBlockEntity))
-				{
-					Locks.LOGGER.debug("ChestPlacement: skipping {} — BE is {} not RandomizableContainerBlockEntity", tePos, be.getClass().getSimpleName());
 					return false;
-				}
 				RandomizableContainerBlockEntity container = (RandomizableContainerBlockEntity) be;
-				if (container.lootTable == null)
-				{
-					Locks.LOGGER.debug("ChestPlacement: skipping {} — lootTable is null (BE type: {})", tePos, be.getClass().getSimpleName());
-					return false;
-				}
-				Locks.LOGGER.debug("ChestPlacement: ACCEPTED {} — lootTable={} BE={}", tePos, container.lootTable, be.getClass().getSimpleName());
-				return true;
+				return container.lootTable != null;
 			});
 	}
 
