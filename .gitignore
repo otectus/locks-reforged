@@ -24,3 +24,6 @@ Thumbs.db
 /original/
 /melonslise/
 /packs/
+
+# Local dependency jars for runtime testing (not build inputs)
+/libs/

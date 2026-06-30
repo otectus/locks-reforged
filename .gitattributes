@@ -1,0 +1,10 @@
+# Normalize line endings. Without this, a CRLF gradlew breaks `./gradlew` on
+# Linux/macOS and in CI (`/bin/sh^M: bad interpreter`).
+* text=auto
+
+# The Gradle POSIX wrapper must stay LF so it executes on Unix shells.
+gradlew text eol=lf
+
+# Windows batch / wrapper scripts must stay CRLF.
+*.bat text eol=crlf
+gradlew.bat text eol=crlf
