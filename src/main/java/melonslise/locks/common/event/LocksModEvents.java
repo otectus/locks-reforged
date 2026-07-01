@@ -4,6 +4,7 @@ import melonslise.locks.Locks;
 import melonslise.locks.common.capability.ILockableHandler;
 import melonslise.locks.common.capability.ILockableStorage;
 import melonslise.locks.common.capability.ISelection;
+import melonslise.locks.common.compat.CarryOnCompat;
 import melonslise.locks.common.compat.CuriosHelper;
 import melonslise.locks.common.compat.RespawningStructuresCompat;
 import melonslise.locks.common.config.LocksConfig;
@@ -27,6 +28,7 @@ public final class LocksModEvents
 		LocksNetwork.register();
 		e.enqueueWork(CuriosHelper::init);
 		e.enqueueWork(RespawningStructuresCompat::init);
+		e.enqueueWork(CarryOnCompat::init);
 	}
 
 	@SubscribeEvent

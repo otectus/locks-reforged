@@ -70,6 +70,13 @@ public class LocksServerConfig
 	public static final ForgeConfigSpec.BooleanValue ENABLE_WANDERER_LOCK_TRADES;
 	public static final ForgeConfigSpec.BooleanValue ENABLE_WANDERER_MECHANISM_TRADES;
 
+	// Compatibility — Carry On
+	public static final ForgeConfigSpec.BooleanValue CARRYON_ENABLE;
+	public static final ForgeConfigSpec.BooleanValue CARRYON_ALLOW_LOCKED;
+	public static final ForgeConfigSpec.BooleanValue CARRYON_REQUIRE_AUTH;
+	public static final ForgeConfigSpec.BooleanValue CARRYON_DENY_PARTIAL_MULTIBLOCK;
+	public static final ForgeConfigSpec.BooleanValue CARRYON_LOG_TRANSFERS;
+
 	public static Pattern[] lockableBlocks;
 	public static List<TagKey<Block>> lockableTags;
 	public static String[][] lootTablePatterns;
@@ -214,6 +221,29 @@ public class LocksServerConfig
 			.define("Enable Wandering Trader Lock Mechanism Trades", true);
 		cfg.pop(); // Wandering Trader
 		cfg.pop(); // Trades
+
+		cfg.comment("Integration with other mods. These sections only take effect when the relevant mod is installed.").push("Compatibility");
+		cfg.comment("Carry On lets players pick up and carry blocks (including containers). These options control how locks are moved with a carried block.").push("CarryOn");
+		CARRYON_ENABLE = cfg
+			.comment("Master switch for Carry On compatibility. When enabled, locks are moved together with the block they protect instead of being left behind.")
+			.define("Enable Carry On Compatibility", true);
+		CARRYON_ALLOW_LOCKED = cfg
+			.comment("Allow locked blocks to be picked up at all. When false, Carry On cannot pick up any locked block (the lock stays put). Unlocked locks are always allowed to move.")
+			.define("Allow Carrying Locked Blocks", true);
+		CARRYON_REQUIRE_AUTH = cfg
+			.comment("Require the player to be authorized to carry a locked block: holding (anywhere in their inventory) a matching key, key ring, or master key, being the Awareness owner, or being in creative.",
+				"When false (default), anyone can carry a locked block and the lock simply travels with it.",
+				"When true, Carry On cannot be used to bypass lock protection.")
+			.define("Require Authorization To Carry Locked Blocks", false);
+		CARRYON_DENY_PARTIAL_MULTIBLOCK = cfg
+			.comment("Deny picking up a block that is part of a multi-block lock (e.g. one half of a locked double chest) when only a single block is being moved.",
+				"This prevents corrupting a lock that spans more blocks than Carry On is moving. Recommended to leave enabled.")
+			.define("Deny Partial Multi Block Lock Pickup", true);
+		CARRYON_LOG_TRANSFERS = cfg
+			.comment("Log every Carry On lock capture/restore to the server log. Useful for debugging.")
+			.define("Log Carry On Lock Transfers", false);
+		cfg.pop(); // CarryOn
+		cfg.pop(); // Compatibility
 
 		SPEC = cfg.build();
 	}

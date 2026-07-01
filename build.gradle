@@ -21,6 +21,15 @@ archivesBaseName = 'locks_reforged'
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
+// Carry On compatibility is optional and compiled only when its jar is vendored under libs/ (gitignored,
+// like respawningstructures). Unlike that reflection-based compat, the Carry On compat uses mixins that
+// need the target classes on the compile classpath, so when the jar is absent we skip the whole thing:
+// exclude the compat mixin sources + config and drop the extra mixin wiring. The mod still builds fine.
+ext.carryOnJar = file('libs/carryon-forge-1.20.1-2.1.2.7.jar')
+ext.hasCarryOn = carryOnJar.exists()
+if (!hasCarryOn)
+    logger.lifecycle("Carry On jar not found at ${carryOnJar} — building without Carry On compatibility.")
+
 minecraft {
     mappings channel: project.mapping_channel, version: project.mapping_version
 
@@ -31,6 +40,7 @@ minecraft {
             workingDirectory project.file('run')
 
             arg "-mixin.config=${project.mod_id}.mixins.json"
+            if (project.hasCarryOn) arg "-mixin.config=${project.mod_id}_carryon.mixins.json"
 
             property 'forge.logging.console.level', 'info'
             property 'mixin.env.remapRefMap', 'true'
@@ -47,6 +57,7 @@ minecraft {
             workingDirectory project.file('run')
 
             arg "-mixin.config=${project.mod_id}.mixins.json"
+            if (project.hasCarryOn) arg "-mixin.config=${project.mod_id}_carryon.mixins.json"
 
             property 'forge.logging.console.level', 'info'
             property 'mixin.env.remapRefMap', 'true'
@@ -87,11 +98,19 @@ processResources {
 
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
+if (!hasCarryOn) {
+    sourceSets.main.java { exclude 'melonslise/locks/mixin/carryon/**' }
+    processResources { exclude 'locks_carryon.mixins.json' }
+}
+
 repositories {
     maven {
         name = "Illusive Soulworks"
         url = "https://maven.theillusivec4.top/"
     }
+    // Vendored mod jars under libs/ (gitignored). flatDir lets fg.deobf() remap them from production
+    // to dev mappings, which files(...) cannot do.
+    flatDir { dirs 'libs' }
     mavenCentral()
 }
 
@@ -100,6 +119,20 @@ dependencies {
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
     compileOnly fg.deobf("top.theillusivec4.curios:curios-forge:5.14.1+1.20.1:api")
     runtimeOnly fg.deobf("top.theillusivec4.curios:curios-forge:5.14.1+1.20.1")
+
+    if (project.hasCarryOn) {
+        // MixinExtras @Local (used by the Carry On placement mixin). Forge 47.2 bundles MixinExtras at
+        // runtime, so this is compileOnly for the annotation only.
+        compileOnly "io.github.llamalad7:mixinextras-common:0.4.0"
+
+        // Carry On, resolved from the flatDir 'libs' repo (file: libs/carryon-forge-1.20.1-2.1.2.7.jar).
+        // compileOnly so the mixin annotation processor can resolve the target classes (tschipp.carryon.*)
+        // at compile time; runtimeOnly so the compat mixins can be exercised via runClient/runServer.
+        // Neither is bundled in the shipped jar. The group is arbitrary/ignored by flatDir; name+version
+        // must match the filename so fg.deobf can remap it from production to dev mappings.
+        compileOnly fg.deobf("blank:carryon-forge-1.20.1:2.1.2.7")
+        runtimeOnly fg.deobf("blank:carryon-forge-1.20.1:2.1.2.7")
+    }
 
     // Unit tests for pure logic (geometry, NBT round-trips, id counter). testImplementation extends
     // implementation, so the deobfuscated Minecraft classpath is available — sufficient for the plain data
@@ -115,6 +148,8 @@ test {
 mixin {
     add sourceSets.main, "${project.mod_id}.refmap.json"
     config "${project.mod_id}.mixins.json"
+    if (project.hasCarryOn)
+        config "${project.mod_id}_carryon.mixins.json"
 }
 
 jar {
@@ -127,7 +162,7 @@ jar {
             "Implementation-Version"  : project.mod_version,
             "Implementation-Vendor"   : project.mod_authors,
             "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
-            "MixinConfigs"            : "${project.mod_id}.mixins.json"
+            "MixinConfigs"            : project.hasCarryOn ? "${project.mod_id}.mixins.json,${project.mod_id}_carryon.mixins.json" : "${project.mod_id}.mixins.json"
         ])
     }
 }

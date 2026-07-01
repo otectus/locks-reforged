@@ -1,5 +1,19 @@
 # Locks Reforged Changelog
 
+## 1.6.5
+
+### Carry On compatibility — locks travel with carried blocks
+- Added optional, server-authoritative compatibility with [Carry On](https://www.curseforge.com/minecraft/mc-mods/carry-on). Because a Locks Reforged lock is a spatial `Lockable` (bounding box + `Lock` + transform + lock item + id) held in per-chunk `LockableStorage`, **not** data on the chest block entity, Carry On — which only copies block state + block-entity NBT — was blind to it. Two concrete failures resulted: with `Protect Lockables` **off**, Carry On removed the block but left the `Lockable` behind (a floating "ghost" lock at the old spot and an unlocked chest at the new one); with it **on**, Carry On gates pickup on a `BlockEvent.BreakEvent` that Locks already cancels for protected locked blocks, so *no* locked container could be carried, even by its owner.
+- Now the existing lock is **moved** with the block (never re-created): id, `Lock` combo, locked/open state, enchantments, Awareness owner, and key / key ring / master key compatibility are all preserved, and the restored lock renders, blocks interaction, supports lockpicking, and persists across chunk reload and server restart. Transfer rides inside the block entity's Forge persistent data — which Carry On already serializes into its carried `"tile"` NBT and restores on placement — so no second storage system is introduced; the canonical store stays `LockableStorage` + `LockableHandler`, updated through the existing `remove(id)` / `add(lockable)` fan-out (all touched chunks marked unsaved, add/remove packets sent).
+- Implemented as three thin mixins into Carry On (`PickupHandler`, `CarryOnData`, `PlacementHandler`) delegating to a new `common/compat/CarryOnCompat` + `CarriedLockTransfer`. Both normal placement (`tryPlaceBlock`) and forced placement on death/drop (`placeCarried`) restore the lock. Locks' `onBlockBreak` now yields to an authorized carry via a thread-scoped marker instead of vetoing it.
+- **Authorization:** carrying an *unlocked* lockable is always allowed (it simply moves so it can't ghost). For *locked* blocks, the new `Require Authorization To Carry Locked Blocks` option (default **off** — anyone can carry, the lock just travels) can be enabled to require a matching key, key ring, master key (anywhere in the inventory, since Carry On needs empty hands), Awareness ownership, or creative — so Carry On can't be used to bypass a lock.
+- **Safety:** a lock spanning more than the single carried block (e.g. a locked double chest) is denied pickup rather than corrupted (`Deny Partial Multi Block Lock Pickup`, default on). A lockable on a block with no block entity (only reachable via Carry On's `pickupAllBlocks`) is denied, since there is nowhere durable to carry the lock.
+- **Config:** new `[Compatibility.CarryOn]` server-config section — `Enable Carry On Compatibility`, `Allow Carrying Locked Blocks`, `Require Authorization To Carry Locked Blocks`, `Deny Partial Multi Block Lock Pickup`, `Log Carry On Lock Transfers`.
+- **Async-chunk safe:** restore validates target chunks are loaded and reuses the main-thread `handler.add`; no new blocking chunk fetches (consistent with the 1.6.x C2ME work).
+
+### Build
+- The Carry On compat is compiled only when `libs/carryon-forge-1.20.1-2.1.2.7.jar` is present (vendored + gitignored, like the Respawning Structures jar). Its mixins need the target classes on the compile classpath, so when the jar is absent the build automatically excludes the compat sources, its mixin config, and all extra mixin wiring — the mod still builds normally, just without Carry On support. A second, plugin-gated mixin config (`locks_carryon.mixins.json`) applies these mixins only when `carryon` is actually installed at runtime.
+
 ## 1.6.4
 
 ### C2ME / Async Chunk — the world-load HANG (re-entrant blocking chunk fetch)

@@ -11,6 +11,7 @@ import melonslise.locks.Locks;
 import melonslise.locks.common.capability.ILockableHandler;
 import melonslise.locks.common.capability.ILockableStorage;
 import melonslise.locks.common.capability.ISelection;
+import melonslise.locks.common.compat.CarryOnCompat;
 import melonslise.locks.common.compat.CuriosHelper;
 import melonslise.locks.common.init.LocksEnchantments;
 import melonslise.locks.common.config.LocksClientConfig;
@@ -754,6 +755,10 @@ public final class LocksForgeEvents
 	@SubscribeEvent
 	public static void onBlockBreak(BlockEvent.BreakEvent e)
 	{
+		// Carry On posts a BreakEvent as its pickup gate. When our Carry On compat has already authorized
+		// carrying this locked block, let it through instead of vetoing the pickup as an illegal break.
+		if(CarryOnCompat.isAuthorizedPickup(e.getPos()))
+			return;
 		if(canBreakLockable(e.getPlayer(), e.getPos()))
 			return;
 		e.setCanceled(true);

@@ -4,6 +4,31 @@
 
 1. **Refmap warning in dev**: The mixin refmap (`locks.refmap.json`) shows "could not be read" in the dev environment. This is a known MixinGradle/ForgeGradle cosmetic issue — dev uses official (Mojang) names which match source annotations directly, so no remapping is needed. The refmap IS correctly included in the production JAR. No fix required.
 
+## Carry On Compatibility (new in 1.6.4)
+
+Locks are moved together with the block when it is picked up and placed with [Carry On](https://www.curseforge.com/minecraft/mc-mods/carry-on). Server-authoritative; optional (only active when `carryon` is installed) and gated by an `IMixinConfigPlugin`.
+
+**How it works:** three thin mixins into Carry On (`PickupHandler`, `CarryOnData`, `PlacementHandler`) delegate to `common/compat/CarryOnCompat` + `CarriedLockTransfer`. On pickup the intersecting `Lockable`s are serialized into the block entity's Forge persistent data (which rides inside Carry On's own carried `"tile"` NBT) and removed from the world; on placement they are offset to the new position and re-registered via `LockableHandler.add`, preserving lock id, `Lock` combo, locked state, enchantments, Awareness owner, and key/keyring/masterkey compatibility. No new storage — the canonical store stays the per-chunk `LockableStorage` + per-level `LockableHandler`.
+
+**Config:** `[Compatibility.CarryOn]` in the server config — master toggle, allow/deny carrying locked blocks, optional authorization requirement (default off: anyone can carry, the lock just moves), deny partial multi-block pickup (default on), and transfer logging.
+
+**Building:** requires `libs/carryon-forge-1.20.1-2.1.2.7.jar` (gitignored, like `respawningstructures`) on the compile classpath for the mixins. If the jar is absent the build automatically skips the compat (sources/config/mixin wiring excluded) and the mod builds normally.
+
+Manual QA (needs a world with Locks + Carry On; not runnable in the headless build env):
+
+- [ ] Lock a single chest → Carry On it → place elsewhere → lock is visible, locked, pickable, key-compatible; no ghost lock at old pos; no duplicate at new pos
+- [ ] Unlocked locked-chest carried and placed, then re-locked with the same key
+- [ ] With `Require Authorization` on: no matching key/ring/masterkey/owner in inventory → pickup denied, lock intact
+- [ ] Awareness lock → only the owner can carry (auth on)
+- [ ] Key ring and Curios key ring authorize (auth on)
+- [ ] Carry across chunk borders / dimensions → all affected chunks save
+- [ ] Server restart after moving → lock persists
+- [ ] Death/drop while carrying (`placeCarried`) → lock restored at drop pos
+- [ ] Locked double chest → pickup denied safely (partial multi-block), original lock intact
+- [ ] After move: hopper extraction, redstone/open interaction, explosion resistance, break protection all honor the restored lock
+- [ ] With Carry On **not** installed → existing Locks behavior unchanged (mixins inert)
+- [ ] With C2ME installed → no blocking chunk fetch regressions during carry/place
+
 ## Resolved Compatibility Issues
 
 - **C2ME hang — world generation freezes (re-entrant blocking chunk fetch)** *(fixed in 1.6.4)*: A silent hang (no crash report, no exception) during initial world load. C2ME's `beforeAwaitChunk` redirect makes the spawn-chunk-blocked Server thread drain the chunk executor (`managedBlock`), which fires `ChunkEvent.Load` re-entrantly on that same thread; `onChunkLoad` ran inline (already "on the server thread") and called a **blocking** `Level#getChunk(x, z)` that re-parked on the chunk future the thread was mid-completing — a permanent self-deadlock. Proven with live `jstack` dumps on the minimal C2ME + locks repro. Fixed by using the live `LevelChunk` the event already supplies (the re-fetch was redundant) with only a non-blocking `hasChunk` guard; hardening `LocksThreadUtil` (no-blocking-fetch contract + safe null-server degrade); and replacing every `hasChunk`-guarded blocking `getChunk`/`getChunkAt` in `LockableHandler` with the non-blocking `getChunkNow`. Also: border-spanning generated locks on already-finished `ImposterProtoChunk` neighbours are now written through to the wrapped chunk's storage instead of an orphaned (never-drained) list, and per-chunk `LockableStorage` map access is now synchronized (`snapshot()`).

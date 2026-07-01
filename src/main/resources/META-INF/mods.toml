@@ -35,3 +35,10 @@ mandatory=false
 versionRange="[5.14.0,)"
 ordering="NONE"
 side="BOTH"
+
+[[dependencies.locks]]
+modId="carryon"
+mandatory=false
+versionRange="[2.1.0,)"
+ordering="AFTER"
+side="BOTH"
