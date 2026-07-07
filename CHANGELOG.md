@@ -1,5 +1,17 @@
 # Locks Reforged Changelog
 
+## 1.7.0
+
+### Lock pick enchantments — counterplay for the picker
+- Added five **lock-pick-side** enchantments in a new `LOCK_PICK` enchantment category, complementing the existing seven lock-side enchantments. Design spine: locks define resistance, lock picks define technique. Each is config-gated (enable toggle + tunable values under the `Enchantments` section) and, when disabled, restores the exact prior behavior.
+  - **Finesse** (RARE, max III) — reduces the chance a pick breaks after a wrong pin by boosting effective pick strength in the break roll only (+15%/level by default). Never affects Complexity/`canPick`; keeps at least a 5% break chance so a pick can never become unbreakable through Finesse alone.
+  - **Attunement** (VERY_RARE, max II) — increases effective pick strength against Complex locks inside `canPick` only (+0.10/level), letting a lower-tier pick cross a Complexity threshold.
+  - **Grounded** (RARE, max III) — reduces Shocking-lock damage while a pick is held in either hand (−20%/level, taking the higher level across both hands), floored at 0.
+  - **Quiet Hand** (UNCOMMON, max I) — lowers the wrong-pin sound volume (1.0 → 0.25 by default); the correct-pin sound is unchanged.
+  - **Last Catch** (VERY_RARE, max I) — a 20% chance to cancel a break that would otherwise occur. **Mutually incompatible with Finesse** (enforced in both classes).
+- **Data-driven enchantability.** Lock picks are now enchantable at the enchanting table, with per-pick enchantability read from a new optional `enchantment_value` field in `data/locks/lockpick_types/*.json` (wood 5, copper 7, iron 10, steel 12, gold 22, diamond 10, netherite 15). The old hardcoded netherite-only enchantability constant is retired in favor of this field; picks with no entry default to 0 (not table-enchantable) and are unaffected.
+- **Config:** new enable toggles (`Enable Finesse/Attunement/Grounded/Quiet Hand/Last Catch`) and a `[Enchantments.Lock Pick]` tuning subsection (`Finesse Strength Per Level`, `Attunement Strength Per Level`, `Grounded Reduction Per Level`, `Last Catch Save Chance`, `Quiet Hand Volume`). Also fixed a misleading `Enable Sturdy` comment to describe what Sturdy actually does (reduces effective pick strength).
+
 ## 1.6.5
 
 ### Carry On compatibility — locks travel with carried blocks

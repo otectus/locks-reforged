@@ -44,6 +44,20 @@ public class LocksServerConfig
 	public static final ForgeConfigSpec.BooleanValue ENABLE_REINFORCED;
 	public static final ForgeConfigSpec.BooleanValue ENABLE_AWARENESS;
 
+	// Lock pick enchantments
+	public static final ForgeConfigSpec.BooleanValue ENABLE_FINESSE;
+	public static final ForgeConfigSpec.BooleanValue ENABLE_ATTUNEMENT;
+	public static final ForgeConfigSpec.BooleanValue ENABLE_GROUNDED;
+	public static final ForgeConfigSpec.BooleanValue ENABLE_QUIET_HAND;
+	public static final ForgeConfigSpec.BooleanValue ENABLE_LAST_CATCH;
+
+	// Lock pick enchantment tuning
+	public static final ForgeConfigSpec.DoubleValue FINESSE_STRENGTH_PER_LEVEL;
+	public static final ForgeConfigSpec.DoubleValue ATTUNEMENT_STRENGTH_PER_LEVEL;
+	public static final ForgeConfigSpec.DoubleValue GROUNDED_REDUCTION_PER_LEVEL;
+	public static final ForgeConfigSpec.DoubleValue LAST_CATCH_SAVE_CHANCE;
+	public static final ForgeConfigSpec.DoubleValue QUIET_HAND_VOLUME;
+
 	// Shocking enchantment tuning
 	public static final ForgeConfigSpec.DoubleValue SHOCKING_DAMAGE_BASE;
 	public static final ForgeConfigSpec.DoubleValue SHOCKING_DAMAGE_PER_LEVEL;
@@ -121,7 +135,7 @@ public class LocksServerConfig
 			.comment("Damages the player when a lock pick breaks")
 			.define("Enable Shocking", true);
 		ENABLE_STURDY = cfg
-			.comment("Makes locks harder to pick (reduces lock pick break chance)")
+			.comment("Makes locks harder to pick by reducing effective lock pick strength")
 			.define("Enable Sturdy", true);
 		ENABLE_COMPLEXITY = cfg
 			.comment("Restricts which lock picks can open the lock")
@@ -138,6 +152,41 @@ public class LocksServerConfig
 		ENABLE_AWARENESS = cfg
 			.comment("Remembers who placed the lock; that player can open it without a key")
 			.define("Enable Awareness", true);
+
+		ENABLE_FINESSE = cfg
+			.comment("Finesse: reduces the chance that lock picks break after a wrong pin.")
+			.define("Enable Finesse", true);
+		ENABLE_ATTUNEMENT = cfg
+			.comment("Attunement: increases effective lock pick strength against complex locks.")
+			.define("Enable Attunement", true);
+		ENABLE_GROUNDED = cfg
+			.comment("Grounded: reduces damage taken from Shocking locks while holding the pick.")
+			.define("Enable Grounded", true);
+		ENABLE_QUIET_HAND = cfg
+			.comment("Quiet Hand: reduces the sound of failed pin attempts.")
+			.define("Enable Quiet Hand", true);
+		ENABLE_LAST_CATCH = cfg
+			.comment("Last Catch: occasionally prevents a lock pick from breaking.")
+			.define("Enable Last Catch", true);
+
+		cfg.comment("Tuning for the lock pick enchantments. Each value scales its enchantment's effect;",
+				"setting an enchantment's Enable toggle above to false disables it entirely regardless of these.").push("Lock Pick");
+		FINESSE_STRENGTH_PER_LEVEL = cfg
+			.comment("Effective pick-strength bonus per Finesse level, applied only to the break roll (higher = fewer breaks). Default 0.15 = +15%/level.")
+			.defineInRange("Finesse Strength Per Level", 0.15d, 0.0d, 5.0d);
+		ATTUNEMENT_STRENGTH_PER_LEVEL = cfg
+			.comment("Effective pick-strength bonus per Attunement level, applied only when checking whether a pick can open a Complex lock. Default 0.10/level.")
+			.defineInRange("Attunement Strength Per Level", 0.10d, 0.0d, 5.0d);
+		GROUNDED_REDUCTION_PER_LEVEL = cfg
+			.comment("Fraction of Shocking damage removed per Grounded level while holding the pick. Default 0.20 = -20%/level (level 3 = -60%).")
+			.defineInRange("Grounded Reduction Per Level", 0.20d, 0.0d, 1.0d);
+		LAST_CATCH_SAVE_CHANCE = cfg
+			.comment("Chance for Last Catch to cancel a break that would otherwise occur. Default 0.20 = 20%.")
+			.defineInRange("Last Catch Save Chance", 0.20d, 0.0d, 1.0d);
+		QUIET_HAND_VOLUME = cfg
+			.comment("Volume of the wrong-pin sound while holding a Quiet Hand pick (normal is 1.0). Default 0.25.")
+			.defineInRange("Quiet Hand Volume", 0.25d, 0.0d, 1.0d);
+		cfg.pop(); // Lock Pick
 
 		cfg.comment("Tuning for the Shocking enchantment and the theft punishments it enables.",
 				"By default, Shocking deals 1.5 damage per enchantment level when a lock pick breaks.",
@@ -288,6 +337,11 @@ public class LocksServerConfig
 		if (enchantment == LocksEnchantments.AUTO_PICK.get()) return ENABLE_AUTO_PICK.get();
 		if (enchantment == LocksEnchantments.REINFORCED.get()) return ENABLE_REINFORCED.get();
 		if (enchantment == LocksEnchantments.AWARENESS.get()) return ENABLE_AWARENESS.get();
+		if (enchantment == LocksEnchantments.FINESSE.get()) return ENABLE_FINESSE.get();
+		if (enchantment == LocksEnchantments.ATTUNEMENT.get()) return ENABLE_ATTUNEMENT.get();
+		if (enchantment == LocksEnchantments.GROUNDED.get()) return ENABLE_GROUNDED.get();
+		if (enchantment == LocksEnchantments.QUIET_HAND.get()) return ENABLE_QUIET_HAND.get();
+		if (enchantment == LocksEnchantments.LAST_CATCH.get()) return ENABLE_LAST_CATCH.get();
 		return true;
 	}
 

@@ -4,6 +4,20 @@
 
 1. **Refmap warning in dev**: The mixin refmap (`locks.refmap.json`) shows "could not be read" in the dev environment. This is a known MixinGradle/ForgeGradle cosmetic issue — dev uses official (Mojang) names which match source annotations directly, so no remapping is needed. The refmap IS correctly included in the production JAR. No fix required.
 
+## Lock Pick Enchantments (new in 1.7.0)
+
+Five lock-pick-side enchantments in a new `LOCK_PICK` enchantment category, complementing the seven lock-side enchantments and providing counterplay ("locks define resistance, lock picks define technique"). Each is config-gated (enable toggle + tunable values under the `Enchantments` → `Lock Pick` section) and, when disabled, restores the exact prior behavior.
+
+- **Finesse** (RARE, max III) — reduces break chance by boosting effective pick strength in the break roll only (+15%/level default). Never affects Complexity/`canPick`; keeps ≥5% break chance so a pick can't become unbreakable via Finesse. Counters Sturdy. Incompatible with Last Catch.
+- **Attunement** (VERY_RARE, max II) — increases effective pick strength against Complex locks inside `canPick` only (+0.10/level). Counters Complexity.
+- **Grounded** (RARE, max III) — reduces Shocking-lock damage while a pick is held in either hand (−20%/level, max level across both hands), floored at 0. Counters Shocking.
+- **Quiet Hand** (UNCOMMON, max I) — lowers the wrong-pin sound volume (1.0 → 0.25 default); correct-pin sound unchanged.
+- **Last Catch** (VERY_RARE, max I) — ~20% chance to cancel a break that would otherwise occur. Incompatible with Finesse.
+
+**Data-driven enchantability:** lock picks are now enchantable at the enchanting table; per-pick enchantability comes from an optional `enchantment_value` field in `data/locks/lockpick_types/*.json` (wood 5, copper 7, iron 10, steel 12, gold 22, diamond 10, netherite 15). Picks with no entry default to 0 (not table-enchantable) and are unaffected.
+
+Verified in the headless build: `./gradlew compileJava`/`build` clean, `runData` boots (registries + config spec build) without error, all JSON valid. In-game behavior is in the Still Needs Testing list below.
+
 ## Carry On Compatibility (new in 1.6.4)
 
 Locks are moved together with the block when it is picked up and placed with [Carry On](https://www.curseforge.com/minecraft/mc-mods/carry-on). Server-authoritative; optional (only active when `carryon` is installed) and gated by an `IMixinConfigPlugin`.
@@ -93,7 +107,7 @@ Manual QA (needs a world with Locks + Carry On; not runnable in the headless bui
 - [ ] World generation (verify locked chests spawn in overworld)
 - [ ] Lock picking minigame UI
 - [ ] Key ring container UI
-- [ ] Enchantment application on locks (now 7 total: Shocking, Sturdy, Complexity, Silent, Auto-Pick, Reinforced, Awareness)
+- [ ] Enchantment application on locks (7 lock-side: Shocking, Sturdy, Complexity, Silent, Auto-Pick, Reinforced, Awareness)
 - [ ] Silent enchantment suppresses rattle sound
 - [ ] Auto-Pick enchantment bypasses minigame at correct rates (10%/20%/30%)
 - [ ] Reinforced enchantment scales explosion resistance
@@ -104,6 +118,14 @@ Manual QA (needs a world with Locks + Carry On; not runnable in the headless bui
 - [ ] Awareness lock rattles for non-owner players
 - [ ] Overlapping Awareness locks from different owners work independently
 - [ ] Awareness config toggle disables the enchantment
+- [ ] Lock picks enchantable at the enchanting table; `enchantment_value` read from `lockpick_types/*.json` (netherite still 15)
+- [ ] Finesse lowers observed break chance (I/II/III); never lets a pick bypass Complexity (`canPick` unaffected); break chance never drops to 0
+- [ ] Attunement lets a weak pick cross a Complexity threshold (I >0.25, II >0.50); disabling it restores the failure
+- [ ] Grounded reduces Shocking damage per level (−20/−40/−60%), from either hand, taking the max level; disabling restores full damage
+- [ ] Quiet Hand reduces wrong-pin volume (1.0 → 0.25) only when present; correct-pin sound unchanged
+- [ ] Last Catch occasionally saves a pick (~20%); anvil/table rejects combining it with Finesse
+- [ ] Netherite unbreakable config still wins over Finesse/Last Catch; Grounded/Quiet Hand still function
+- [ ] Each lock-pick enchantment's config toggle disables it (hidden from table/trades/loot) and its tunable values take effect
 - [ ] Netherite lock has 14 pins in lock picking screen
 - [ ] Netherite lock pick has 0.95 strength in tooltip
 - [ ] Netherite lock pick rarely breaks (high strength)

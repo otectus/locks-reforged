@@ -40,7 +40,9 @@ Pick locks with an interactive pin-matching minigame. Match each pin to crack th
 ### Keys & Key Rings
 Craft **keys** that match your locks, or use a **Key Ring** to carry multiple keys. A **Master Key** opens any lock.
 
-### Seven Enchantments
+### Enchantments
+
+**Lock enchantments** — go on the lock:
 - **Shocking** — Zaps players who fail a pick attempt (bypasses armor)
 - **Sturdy** — Reduces pick effectiveness
 - **Complexity** — Blocks lower-tier picks entirely
@@ -49,7 +51,14 @@ Craft **keys** that match your locks, or use a **Key Ring** to carry multiple ke
 - **Reinforced** — Increases explosion resistance per level
 - **Awareness** — Remembers who placed the lock; that player can open it without a key
 
-Each enchantment can be individually enabled or disabled in the server config.
+**Lock pick enchantments** — go on the pick, and provide counterplay (new in 1.7.0):
+- **Finesse** — Reduces the chance a pick breaks after a wrong pin (counters Sturdy)
+- **Attunement** — Boosts effective pick strength against complex locks (counters Complexity)
+- **Grounded** — Reduces damage from Shocking locks while holding the pick (counters Shocking)
+- **Quiet Hand** — Reduces the sound of failed pin attempts
+- **Last Catch** — Occasionally prevents a pick from breaking (incompatible with Finesse)
+
+Lock picks are now enchantable at the enchanting table. Each enchantment can be individually enabled — and the lock pick enchantments' effects tuned — in the server config.
 
 ### Full Protection
 Locked blocks are protected from:
@@ -98,10 +107,12 @@ Drop a JSON file into the config folder to register a brand new lock or lock pic
 **To add a custom lock pick**, create `config/locks/lockpick_types/<name>.json`:
 ```json
 {
-  "strength": 0.5
+  "strength": 0.5,
+  "enchantment_value": 10
 }
 ```
 - `strength` — Pick effectiveness (0.01-10.0)
+- `enchantment_value` — Enchantability at the enchanting table (higher = better enchantments; optional, default 0 = not enchantable)
 
 The filename becomes the item's registry name under the `locks:` namespace (e.g., `netherite_lock.json` registers as `locks:netherite_lock`). Config-folder items override JAR-bundled items of the same name, so you can also use this to replace built-in stats.
 
@@ -186,7 +197,7 @@ All settings are customizable via config files. Note that `locks-server.toml` is
 - **Protect Lockables** — Whether locked blocks are break-proof in survival (default: true)
 - **Easy Lock** — One-click lock placement (default: true)
 - **Hide Lock ID / Hide HUD Enchantments** — Tooltip display options
-- **Enchantment Toggles** — Individually enable or disable each of the 7 enchantments
+- **Enchantment Toggles** — Individually enable or disable each of the 12 enchantments (7 lock-side + 5 lock-pick-side), and tune the lock pick enchantments' effects
 - **Netherite Lockpick Unbreakable** — When enabled, netherite lock picks never break (default: false)
 
 **`config/locks-client.toml`** — Client-side settings

@@ -5,6 +5,7 @@ import java.util.List;
 import melonslise.locks.Locks;
 import melonslise.locks.common.config.LocksServerConfig;
 import melonslise.locks.common.init.LocksEnchantments;
+import melonslise.locks.common.init.LocksTagHelper;
 import melonslise.locks.common.init.LockTypeRegistry;
 import melonslise.locks.common.util.Lockable;
 import net.minecraft.resources.ResourceLocation;
@@ -28,7 +29,6 @@ public class LockPickItem extends Item
 	public static final Component TOO_COMPLEX_MESSAGE = Component.translatable(Locks.ID + ".status.too_complex");
 	public static final ResourceLocation NETHERITE_LOCK_PICK_ID = new ResourceLocation(Locks.ID, "netherite_lock_pick");
 	public static final int NETHERITE_DURABILITY = 128;
-	private static final int NETHERITE_ENCHANTABILITY = 15;
 
 	public LockPickItem(Properties props)
 	{
@@ -48,7 +48,11 @@ public class LockPickItem extends Item
 
 	public static boolean canPick(ItemStack stack, int cmp)
 	{
-		return getOrSetStrength(stack) > cmp * 0.25f;
+		float strength = getOrSetStrength(stack);
+		if(LocksServerConfig.ENABLE_ATTUNEMENT.get())
+			strength += EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.ATTUNEMENT.get(), stack)
+				* (float) (double) LocksServerConfig.ATTUNEMENT_STRENGTH_PER_LEVEL.get();
+		return strength > cmp * 0.25f;
 	}
 
 	public static boolean canPick(ItemStack stack, Lockable lkb)
@@ -79,9 +83,16 @@ public class LockPickItem extends Item
 	}
 
 	@Override
+	public boolean isEnchantable(ItemStack stack)
+	{
+		return stack.getCount() == 1 && LocksTagHelper.isLockPick(stack);
+	}
+
+	@Override
 	public int getEnchantmentValue()
 	{
-		return isNetheriteLockPick(this) ? NETHERITE_ENCHANTABILITY : super.getEnchantmentValue();
+		int value = LockTypeRegistry.getLockPickStats(this).enchantmentValue();
+		return value > 0 ? value : super.getEnchantmentValue();
 	}
 
 	@Override

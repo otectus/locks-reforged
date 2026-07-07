@@ -138,7 +138,11 @@ public class LockPickingContainer extends AbstractContainerMenu
 			{
 				// Wrong pin without a broken pick — opt-in punishment, off by default (mutually exclusive with PICK_BREAK above)
 				ShockingHelper.tryShock(this.player, this.lockable.stack, this.pos, ShockingHelper.Trigger.WRONG_PIN);
-				this.player.level().playSound(null, this.pos.x, this.pos.y, this.pos.z, LocksSoundEvents.PIN_FAIL.get(), SoundSource.BLOCKS, 1f, 1f);
+				ItemStack pickStack = this.player.getItemInHand(this.hand);
+				float failVolume = LocksServerConfig.ENABLE_QUIET_HAND.get()
+					&& EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.QUIET_HAND.get(), pickStack) > 0
+					? (float) (double) LocksServerConfig.QUIET_HAND_VOLUME.get() : 1f;
+				this.player.level().playSound(null, this.pos.x, this.pos.y, this.pos.z, LocksSoundEvents.PIN_FAIL.get(), SoundSource.BLOCKS, failVolume, 1f);
 			}
 		}
 		LocksNetwork.MAIN.send(PacketDistributor.PLAYER.with(() -> (ServerPlayer) this.player), new TryPinResultPacket(correct, reset));
@@ -165,10 +169,24 @@ public class LockPickingContainer extends AbstractContainerMenu
 			&& LockPickItem.isNetheriteLockPick(pickStack))
 			return false;
 		float sturdyModifier = this.sturdy == 0 ? 1f : 0.75f + this.sturdy * 0.5f;
-		float ch = LockPickItem.getOrSetStrength(pickStack) / sturdyModifier;
+		float strength = LockPickItem.getOrSetStrength(pickStack);
+		int finesse = LocksServerConfig.ENABLE_FINESSE.get()
+			? EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.FINESSE.get(), pickStack) : 0;
+		if (finesse > 0)
+			strength *= 1f + finesse * (float) (double) LocksServerConfig.FINESSE_STRENGTH_PER_LEVEL.get();
+		float ch = strength / sturdyModifier;
 		float ex = (1f - ch) * (1f - this.getBreakChanceMultiplier(pin));
+		float survive = ex + ch;
+		// Finesse can never make a pick unbreakable: keep at least a 5% break chance when it is boosting.
+		if (finesse > 0)
+			survive = Math.min(survive, 0.95f);
 
-		if (player.level().getRandom().nextFloat() < ex + ch)
+		if (player.level().getRandom().nextFloat() < survive)
+			return false;
+		// Last Catch: one more chance to save the pick before it breaks.
+		int lastCatch = LocksServerConfig.ENABLE_LAST_CATCH.get()
+			? EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.LAST_CATCH.get(), pickStack) : 0;
+		if (lastCatch > 0 && player.level().getRandom().nextFloat() < (float) (double) LocksServerConfig.LAST_CATCH_SAVE_CHANCE.get())
 			return false;
 		if (LockPickItem.usesDurability(pickStack))
 			LockPickItem.damagePick(pickStack, player, this.hand);

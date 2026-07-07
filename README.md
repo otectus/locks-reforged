@@ -19,7 +19,7 @@ This port preserves the original mod's license: **Attribution-NonCommercial 3.0 
 
 The original Locks mod was built for Minecraft 1.16.5 (Forge 36.x). This port updates it to Minecraft 1.20.1 (Forge 47.x) while preserving all original gameplay mechanics, item IDs, config keys, and network protocol.
 
-**Version:** 1.6.4 | **Minecraft:** 1.20.1 | **Forge:** 47.2.0+ | **Java:** 17
+**Version:** 1.7.0 | **Minecraft:** 1.20.1 | **Forge:** 47.2.0+ | **Java:** 17
 
 ## Features
 
@@ -43,6 +43,10 @@ An interactive lock picking mechanic with a pin-matching system. Each lock has a
 
 ### Enchantments
 
+Locks define resistance; lock picks define technique. **Lock enchantments** go on the lock and make it harder to defeat; **lock pick enchantments** go on the pick and provide counterplay.
+
+**Lock enchantments** (applied to locks):
+
 | Enchantment | Max Level | Effect |
 |-------------|-----------|--------|
 | **Shocking** | V | Electrocutes players who fail to pick the lock (bypasses armor) |
@@ -53,7 +57,17 @@ An interactive lock picking mechanic with a pin-matching system. Each lock has a
 | **Reinforced** | III | Increases explosion resistance by 50%/100%/150%. Protects against TNT and creepers |
 | **Awareness** | I | Remembers who placed the lock; that player can open it without a key |
 
-Each enchantment can be individually enabled or disabled in the server config.
+**Lock pick enchantments** (applied to lock picks — counterplay to the lock enchantments; new in 1.7.0):
+
+| Enchantment | Max Level | Effect |
+|-------------|-----------|--------|
+| **Finesse** | III | Reduces the chance a pick breaks after a wrong pin (counters Sturdy). Never affects Complexity. Incompatible with Last Catch |
+| **Attunement** | II | Increases effective pick strength against complex locks (counters Complexity), letting a lower-tier pick cross a threshold |
+| **Grounded** | III | Reduces damage taken from Shocking locks while holding the pick, in either hand (counters Shocking) |
+| **Quiet Hand** | I | Reduces the sound of failed pin attempts |
+| **Last Catch** | I | ~20% chance to prevent a pick from breaking. Incompatible with Finesse |
+
+Lock picks are enchantable at the enchanting table (see the `enchantment_value` field below). Each enchantment can be individually enabled — and its effect tuned — in the server config.
 
 ### World Generation
 Generated chests can spawn with a lock whose tier is chosen by **loot value** — the richer a chest's loot table, the stronger its lock. Chests whose loot value falls **below the lowest configured threshold receive no lock at all**, while very valuable chests can receive diamond or netherite locks. The estimator weighs item rarity, enchantments, and stack counts (with sub-linear scaling so bulk common items don't inflate value) and supports per-item value overrides for materials like diamonds and netherite that are valuable despite a common rarity. The whole system can be switched to random weighted selection in the common config.
@@ -110,6 +124,7 @@ On first launch, the mod creates these directories with a `_example.json.disable
 ```json
 {
   "strength": 0.35,
+  "enchantment_value": 10,
   "fire_resistant": false
 }
 ```
@@ -117,6 +132,7 @@ On first launch, the mod creates these directories with a `_example.json.disable
 | Field | Description |
 |-------|-------------|
 | `strength` | Pick effectiveness (0.0–1.0, higher = stronger) |
+| `enchantment_value` | Enchantability at the enchanting table (higher = better enchantments; optional, default 0 = not table-enchantable) |
 | `fire_resistant` | Whether the item survives in lava/fire (optional, default false) |
 
 **Important:** Custom items added via config also need:
@@ -173,7 +189,7 @@ Only fields present in the override are changed; omitted fields keep their defau
 - **Protect Lockables** -- Whether locked blocks are protected from being broken
 - **Max Lockable Volume / Lockable Blocks / Lockable Tags** -- What can be locked and how large a single lock may be
 - **Display** (Hide Lock ID / Hide HUD Enchantments / Hide HUD Tooltip) -- Tooltip and HUD visibility toggles
-- **Enchantment Toggles** -- Each of the 7 enchantments (Shocking, Sturdy, Complexity, Silent, Auto-Pick, Reinforced, Awareness) can be individually enabled or disabled
+- **Enchantment Toggles** -- Each of the 12 enchantments — 7 lock-side (Shocking, Sturdy, Complexity, Silent, Auto-Pick, Reinforced, Awareness) and 5 lock-pick-side (Finesse, Attunement, Grounded, Quiet Hand, Last Catch) — can be individually enabled or disabled, and the lock-pick enchantments' effects tuned, under the **Enchantments** section
 - **Shocking** subsection -- Tune Shocking damage and theft punishments (see below)
 - **Netherite Lockpick Unbreakable** -- When enabled, netherite lock picks never break during lock picking (default: false)
 - **Loot Table Injection Patterns** -- Which loot tables receive lock pick / key injection (default: `minecraft:chests/`)
@@ -240,7 +256,7 @@ cd "Locks Reforged"
 # Build the mod JAR
 JAVA_HOME="/path/to/jdk-17" ./gradlew build
 
-# Output: build/libs/locks_reforged-1.6.4.jar
+# Output: build/libs/locks_reforged-1.7.0.jar
 
 # Run the development client
 JAVA_HOME="/path/to/jdk-17" ./gradlew runClient
@@ -249,7 +265,7 @@ JAVA_HOME="/path/to/jdk-17" ./gradlew runClient
 ## Installation
 
 1. Install [Minecraft Forge 1.20.1](https://files.minecraftforge.net/net/minecraftforge/forge/index_1.20.1.html) (47.2.0 or later)
-2. Download `locks_reforged-1.6.4.jar` from the releases
+2. Download `locks_reforged-1.7.0.jar` from the releases
 3. Place the JAR in your `.minecraft/mods/` folder
 4. Launch Minecraft with the Forge profile
 

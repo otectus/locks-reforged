@@ -7,6 +7,7 @@ import melonslise.locks.common.config.LocksServerConfig;
 import melonslise.locks.common.init.LocksDamageSources;
 import melonslise.locks.common.init.LocksEnchantments;
 import melonslise.locks.common.init.LocksSoundEvents;
+import melonslise.locks.common.init.LocksTagHelper;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -88,6 +89,18 @@ public final class ShockingHelper
 		if(damage <= 0f)
 			return false;
 
+		// Grounded: a pick held in either hand insulates the thief, reducing shock damage by its highest level.
+		if(LocksServerConfig.ENABLE_GROUNDED.get())
+		{
+			int grounded = groundedLevel(player);
+			if(grounded > 0)
+			{
+				damage *= Math.max(0f, 1f - grounded * (float) (double) LocksServerConfig.GROUNDED_REDUCTION_PER_LEVEL.get());
+				if(damage <= 0f)
+					return false;
+			}
+		}
+
 		int cooldown = LocksServerConfig.SHOCKING_COOLDOWN_TICKS.get();
 		if(cooldown > 0)
 		{
@@ -102,5 +115,18 @@ public final class ShockingHelper
 		Vec3 pos = soundPos != null ? soundPos : player.position();
 		player.level().playSound(null, pos.x, pos.y, pos.z, LocksSoundEvents.SHOCK.get(), SoundSource.BLOCKS, 1f, 1f);
 		return true;
+	}
+
+	/** Highest Grounded level across the player's hands, considering only lock picks. 0 if none. */
+	private static int groundedLevel(Player player)
+	{
+		int grounded = 0;
+		ItemStack main = player.getMainHandItem();
+		if(LocksTagHelper.isLockPick(main))
+			grounded = Math.max(grounded, EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.GROUNDED.get(), main));
+		ItemStack off = player.getOffhandItem();
+		if(LocksTagHelper.isLockPick(off))
+			grounded = Math.max(grounded, EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.GROUNDED.get(), off));
+		return grounded;
 	}
 }
