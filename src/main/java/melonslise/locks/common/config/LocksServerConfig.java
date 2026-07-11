@@ -8,6 +8,7 @@ import com.google.common.collect.Lists;
 
 import melonslise.locks.Locks;
 import melonslise.locks.common.init.LocksBlockTags;
+import melonslise.locks.common.steel.SteelMaterialMode;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
@@ -29,6 +30,8 @@ public class LocksServerConfig
 	public static final ForgeConfigSpec.BooleanValue ALLOW_REMOVING_LOCKS;
 	public static final ForgeConfigSpec.BooleanValue PROTECT_LOCKABLES;
 	public static final ForgeConfigSpec.BooleanValue EASY_LOCK;
+
+	public static final ForgeConfigSpec.EnumValue<SteelMaterialMode> STEEL_MATERIAL_MODE;
 
 	public static final ForgeConfigSpec.ConfigValue<List<? extends String>> LOCKABLE_TAGS;
 
@@ -117,6 +120,24 @@ public class LocksServerConfig
 		EASY_LOCK = cfg
 			.comment("Lock blocks with just one click! It's magic! (Will probably fail spectacularly with custom doors, custom double chests, etc)")
 			.define("Easy Lock", true);
+
+		STEEL_MATERIAL_MODE = cfg
+			.comment("Controls whether Locks provides (and generates) its own native steel material.",
+				"Locks ships steel_ingot, steel_nugget, steel_ore and deepslate_steel_ore so its steel locks are",
+				"always craftable, and merges them into the standard Forge steel tags (forge:ingots/steel,",
+				"forge:nuggets/steel, forge:ores/steel). The native blocks/items are ALWAYS registered so old worlds",
+				"and existing stacks stay valid — this setting only controls acquisition (recipes, ore generation,",
+				"creative-tab presentation).",
+				"  AUTO          - default. For each form (ingot/nugget/ore), provide Locks' native version only when",
+				"                  no OTHER mod already supplies it via the Forge steel tags (Locks' own entries are",
+				"                  ignored when detecting external steel). Native ore only generates when no foreign",
+				"                  steel ore exists and the native ingot is active.",
+				"  FORCE_NATIVE  - always enable Locks' native steel recipes and ore generation, even alongside an",
+				"                  external steel economy.",
+				"  EXTERNAL_ONLY - never enable native steel acquisition or generation, even if the steel tags are",
+				"                  empty (a warning is logged for any missing form).",
+				"Changing this may require a datapack reload (/reload) for recipes and a world reload for ore generation.")
+			.defineEnum("Steel Material Mode", SteelMaterialMode.AUTO);
 
 		cfg.push("Display");
 		HIDE_LOCK_ID = cfg

@@ -1,0 +1,17 @@
+{
+	"type": "minecraft:blasting",
+	"conditions":
+	[
+		{
+			"type": "locks:steel",
+			"query": "native_ingot"
+		}
+	],
+	"ingredient":
+	{
+		"tag": "forge:ingots/iron"
+	},
+	"result": "locks:steel_ingot",
+	"experience": 0.35,
+	"cookingtime": 200
+}

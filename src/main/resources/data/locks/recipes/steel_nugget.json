@@ -1,0 +1,21 @@
+{
+	"type": "minecraft:crafting_shapeless",
+	"conditions":
+	[
+		{
+			"type": "locks:steel",
+			"query": "native_nugget"
+		}
+	],
+	"ingredients":
+	[
+		{
+			"tag": "forge:ingots/steel"
+		}
+	],
+	"result":
+	{
+		"item": "locks:steel_nugget",
+		"count": 9
+	}
+}

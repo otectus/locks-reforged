@@ -2,6 +2,7 @@ package melonslise.locks.common.init;
 
 import melonslise.locks.Locks;
 import melonslise.locks.common.worldgen.ChestPlacement;
+import melonslise.locks.common.worldgen.SteelOrePlacement;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.levelgen.placement.PlacementModifierType;
 import net.minecraftforge.registries.DeferredRegister;
@@ -14,6 +15,9 @@ public final class LocksPlacements
 
 	public static final RegistryObject<PlacementModifierType<ChestPlacement>>
 		CHEST = PLACEMENT_MODIFIERS.register("chest", () -> () -> ChestPlacement.CODEC);
+
+	public static final RegistryObject<PlacementModifierType<SteelOrePlacement>>
+		STEEL_ORE = PLACEMENT_MODIFIERS.register("steel_ore", () -> () -> SteelOrePlacement.CODEC);
 
 	private LocksPlacements() {}
 

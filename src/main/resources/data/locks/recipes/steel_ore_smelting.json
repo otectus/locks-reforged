@@ -1,0 +1,17 @@
+{
+	"type": "minecraft:smelting",
+	"conditions":
+	[
+		{
+			"type": "locks:steel",
+			"query": "native_ingot"
+		}
+	],
+	"ingredient":
+	{
+		"tag": "forge:ores/steel"
+	},
+	"result": "locks:steel_ingot",
+	"experience": 0.7,
+	"cookingtime": 200
+}

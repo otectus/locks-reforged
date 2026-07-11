@@ -82,6 +82,11 @@ Lock tier is determined by the **value of a chest's loot table contents**. Villa
 - Toolsmith villagers sell lock picks and mechanisms
 - Wandering traders offer rare picks and enchanted locks
 
+### Native Steel — self-sufficient, but defers to your modpack
+Locks Reforged ships its own steel so the steel tier is fully craftable with no other mod: **Steel Ingot**, **Steel Nugget**, and **Steel Ore** / **Deepslate Steel Ore** (uncommon Overworld generation; smelt or blast into ingots). Everything lives in the standard `forge:ingots/steel`, `forge:nuggets/steel`, and `forge:ores/steel` tags, so steel from Create, Immersive Engineering, Mekanism, Thermal, etc. works in every Locks recipe.
+
+When your pack already has a steel economy, Locks **detects it and steps aside** — it stops generating its ore and offering redundant steel-production recipes (its own tag entries are ignored during detection, so its ingot never masks a real provider). Each form is independent: a mod with steel ingots but no nuggets still gets Locks' nugget as a fallback. The native blocks/items always stay registered (existing worlds and stacks stay valid; disabled steel is still `/give`-able) — only *acquisition* is toggled. A server-config **`Steel Material Mode`** (`AUTO` / `FORCE_NATIVE` / `EXTERNAL_ONLY`) overrides the automatic behavior.
+
 ---
 
 ## Adding Custom Locks & Lock Picks

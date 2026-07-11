@@ -11,6 +11,8 @@ import melonslise.locks.common.config.LocksConfig;
 import melonslise.locks.common.config.LocksServerConfig;
 import melonslise.locks.common.init.LockTypeRegistry;
 import melonslise.locks.common.init.LocksNetwork;
+import melonslise.locks.common.steel.NativeSteelCondition;
+import net.minecraftforge.common.crafting.CraftingHelper;
 import net.minecraftforge.common.capabilities.RegisterCapabilitiesEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -26,6 +28,9 @@ public final class LocksModEvents
 	public static void onSetup(FMLCommonSetupEvent e)
 	{
 		LocksNetwork.register();
+		// Recipe condition serializers must be registered before the first datapack load; enqueueWork keeps it
+		// on the main thread as CraftingHelper's registry is not thread-safe.
+		e.enqueueWork(() -> CraftingHelper.register(NativeSteelCondition.Serializer.INSTANCE));
 		e.enqueueWork(CuriosHelper::init);
 		e.enqueueWork(RespawningStructuresCompat::init);
 		e.enqueueWork(CarryOnCompat::init);

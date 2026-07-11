@@ -1,0 +1,8 @@
+{
+	"replace": false,
+	"values":
+	[
+		"locks:steel_ore",
+		"locks:deepslate_steel_ore"
+	]
+}

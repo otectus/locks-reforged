@@ -28,6 +28,10 @@ public final class LocksItems
 		IRON_LOCK_MECHANISM = ITEMS.register("iron_lock_mechanism", () -> new Item(new Item.Properties())),
 		STEEL_LOCK_MECHANISM = ITEMS.register("steel_lock_mechanism", () -> new Item(new Item.Properties())),
 		COPPER_LOCK_MECHANISM = ITEMS.register("copper_lock_mechanism", () -> new Item(new Item.Properties())),
+		// Steel material - provided by this mod so forge:ingots/steel and forge:nuggets/steel are
+		// never empty in a vanilla-only install; external steel mods merge into the same tags.
+		STEEL_INGOT = ITEMS.register("steel_ingot", () -> new Item(new Item.Properties())),
+		STEEL_NUGGET = ITEMS.register("steel_nugget", () -> new Item(new Item.Properties())),
 		KEY_BLANK = ITEMS.register("key_blank", () -> new Item(new Item.Properties())),
 		KEY = ITEMS.register("key", () -> new KeyItem(new Item.Properties())),
 		MASTER_KEY = ITEMS.register("master_key", () -> new MasterKeyItem(new Item.Properties())),

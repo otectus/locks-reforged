@@ -4,6 +4,16 @@
 
 1. **Refmap warning in dev**: The mixin refmap (`locks.refmap.json`) shows "could not be read" in the dev environment. This is a known MixinGradle/ForgeGradle cosmetic issue — dev uses official (Mojang) names which match source annotations directly, so no remapping is needed. The refmap IS correctly included in the production JAR. No fix required.
 
+## Native Steel Fallback (new in 1.7.1)
+
+Locks ships its own steel material (`steel_ingot`, `steel_nugget`, `steel_ore`, `deepslate_steel_ore`) and merges it into the standard `forge:ingots/steel` / `forge:nuggets/steel` / `forge:ores/steel` tags, but **prefers a modpack's own steel** when one exists.
+
+**How it works:** one detection service — `common/steel/NativeSteelPolicy` — inspects the *members* of the Forge steel tags, filters out Locks' own IDs (so its ingot never masks a real external provider), and decides per material form whether the native version is active. A custom recipe condition (`locks:steel`, registered via `CraftingHelper` in `FMLCommonSetupEvent`) gates the native-producing recipes; a custom placement modifier (`locks:steel_ore`) gates ore generation from a cached, thread-safe policy snapshot refreshed on `TagsUpdatedEvent`. The native blocks/items are **always registered** (existing worlds/stacks stay valid) — only acquisition is toggled. Server config `Steel Material Mode` (`AUTO` / `FORCE_NATIVE` / `EXTERNAL_ONLY`) overrides the automatic behavior.
+
+**Detection & fallback rules (AUTO):** native ingot ⇔ no foreign ingot; native nugget ⇔ no foreign nugget; native ore gen ⇔ no foreign ore **and** native ingot active. Each form is independent (e.g. a mod with ingots but no nuggets still gets Locks' nugget).
+
+**Verified:** `./gradlew test` (9 new pure-logic policy tests + 16 existing, all pass), `compileJava` / `build` / `runData` clean, JAR contains all blockstates/models/textures/loot/tags/recipes/features/biome-modifier/lang. Dedicated-server boot **alone** logs `ingot=true, nugget=true, oreGeneration=true` with no foreign steel; **with a datapack adding vanilla iron to the three steel tags** it correctly reports the foreign IDs and flips all native fallbacks off — no recipe/worldgen errors either way. Remaining in-game checks (visual ore render/gen, live mode-switch in JEI) are in the Still Needs Testing list below.
+
 ## Lock Pick Enchantments (new in 1.7.0)
 
 Five lock-pick-side enchantments in a new `LOCK_PICK` enchantment category, complementing the seven lock-side enchantments and providing counterplay ("locks define resistance, lock picks define technique"). Each is config-gated (enable toggle + tunable values under the `Enchantments` → `Lock Pick` section) and, when disabled, restores the exact prior behavior.

@@ -1,0 +1,35 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"conditions":
+	[
+		{
+			"type": "forge:not",
+			"value":
+			{
+				"type": "locks:steel",
+				"query": "steel_available"
+			}
+		}
+	],
+	"pattern":
+	[
+		" D ",
+		"DLD",
+		"DDD"
+	],
+	"key":
+	{
+		"D":
+		{
+			"tag": "forge:gems/diamond"
+		},
+		"L":
+		{
+			"item": "locks:iron_lock_mechanism"
+		}
+	},
+	"result":
+	{
+		"item": "locks:diamond_lock"
+	}
+}

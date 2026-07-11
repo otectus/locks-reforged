@@ -6,6 +6,7 @@ import org.apache.logging.log4j.Logger;
 import melonslise.locks.common.config.LocksClientConfig;
 import melonslise.locks.common.config.LocksConfig;
 import melonslise.locks.common.config.LocksServerConfig;
+import melonslise.locks.common.init.LocksBlocks;
 import melonslise.locks.common.init.LocksCreativeTabs;
 import melonslise.locks.common.init.LocksEnchantments;
 import melonslise.locks.common.init.LocksFeatures;
@@ -31,6 +32,7 @@ public final class Locks
 		ModLoadingContext.get().registerConfig(Type.COMMON, LocksConfig.SPEC);
 		ModLoadingContext.get().registerConfig(Type.CLIENT, LocksClientConfig.SPEC);
 
+		LocksBlocks.register();
 		LocksItems.register();
 		LocksEnchantments.register();
 		LocksSoundEvents.register();

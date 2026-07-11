@@ -1,5 +1,19 @@
 # Locks Reforged Changelog
 
+## 1.7.1
+
+### Native steel fallback — self-sufficient steel that defers to a modpack's own steel economy
+- **Fixed the reported "empty tag: forge:ingots/steel" crafting failure.** The mod shipped full steel *content* (steel lock, lock pick, and mechanism items, models, textures, lang, creative tab) but never provided the steel *material*, so in a vanilla-only pack every steel recipe showed an uncraftable empty-tag ingredient.
+- Added **Steel Ingot** (`locks:steel_ingot`), **Steel Nugget** (`locks:steel_nugget`), **Steel Ore** (`locks:steel_ore`) and **Deepslate Steel Ore** (`locks:deepslate_steel_ore`) with models, textures, blockstates, loot tables, translations, and creative-tab entries. They populate the standard `forge:ingots/steel`, `forge:nuggets/steel`, `forge:ores/steel` tags (plus the `forge:ingots` / `forge:nuggets` / `forge:ores` umbrellas and `minecraft:mineable/pickaxe` + `needs_iron_tool`), so steel is fully craftable in a locks-only install **and** any external steel mod (Create, Immersive Engineering, Mekanism, Thermal, …) merges into the same tags automatically.
+- **Prefers a modpack's own steel.** A single detection policy (`common/steel/NativeSteelPolicy`) inspects the members of the Forge steel tags — **ignoring Locks' own entries** so its own ingot never masks the check — and, per material form, only enables Locks' native version when no *foreign* mod already provides it. Each form falls back independently: an external mod that ships steel ingots but no nuggets still gets Locks' nugget as a missing-form fallback. When a complete external provider supplies ore + ingot + nugget, all native acquisition (recipes, ore generation) and the redundant creative-tab entries are suppressed.
+- **Native ore generation** is conservative Overworld-only (uncommon veins, gated to `#minecraft:is_overworld`, no Nether/End) and only runs when no foreign steel ore exists and the native ingot is active — via a custom placement modifier that reads a cached, thread-safe policy snapshot, so it never double-generates against an existing steel economy. Steel ore drops itself (Silk-Touch-safe) and smelts/blasts to a steel ingot.
+- **Registry safety.** The native blocks and items are **always registered under stable IDs** regardless of mode or installed mods — "disabled" only removes *acquisition* (no ore gen, no native-producing recipes, omitted from the creative tab, never a hardcoded ingredient). Existing worlds keep their placed `locks:steel_ore` and existing steel stacks; nothing is unregistered or remapped away.
+- **New `Steel Material Mode` server config** (`AUTO` / `FORCE_NATIVE` / `EXTERNAL_ONLY`) overrides the automatic behavior — force native steel even alongside another mod, or disable native acquisition entirely. Server-authoritative; changing it may need a `/reload` (recipes) and world reload (ore generation).
+- **Custom recipe condition** (`locks:steel`) replaces the naïve `forge:tag_empty` check, which was insufficient once Locks populates the tag itself. Recipes that *produce* native steel load only when that form's native fallback is active; steel locks/mechanisms/picks stay tag-based and accept any foreign tagged steel.
+- **Fixed a copy/paste bug:** `steel_lock_pick.json` produced `iron_lock_pick` instead of `steel_lock_pick`. The steel lock pick now yields the steel pick.
+- **Fixed hidden upper-tier breakage.** `gold_lock` and `diamond_lock` require `steel_lock_mechanism`; if steel is ever entirely absent, an iron-mechanism fallback recipe activates instead so gold/diamond/netherite stay craftable.
+- **Diagnostics:** on server data load, a single concise summary logs the selected mode, any detected foreign ingot/nugget/ore IDs, and which native fallbacks are active. `EXTERNAL_ONLY` with empty steel tags logs a warning naming the missing forms instead of crashing.
+
 ## 1.7.0
 
 ### Lock pick enchantments — counterplay for the picker

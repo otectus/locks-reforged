@@ -3,7 +3,7 @@
 ## Quick Reference
 - **Mod ID**: `locks`
 - **Package**: `melonslise.locks` (original author's package, NOT com.otectus)
-- **Version**: 1.7.0
+- **Version**: 1.7.1
 - **MC**: 1.20.1 | **Forge**: 47.2.0 | **Java**: 17
 - **Mappings**: Official
 - **License**: CC BY-NC 3.0 (Attribution-NonCommercial)

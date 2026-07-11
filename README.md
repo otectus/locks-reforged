@@ -37,6 +37,20 @@ All lock and lock pick types are defined via JSON files, making it easy to add c
 | **Keys** | Key Blank, Key, Master Key, Key Ring |
 | **Lock Picks** | Wood, Bobby Pin (copper), Iron, Steel, Gold, Diamond, Netherite (+ custom) |
 | **Components** | Spring, Wood/Copper/Iron/Steel Lock Mechanisms |
+| **Materials** | Steel Ingot, Steel Nugget, Steel Ore, Deepslate Steel Ore (native fallback; populate `forge:ingots/steel` / `forge:nuggets/steel` / `forge:ores/steel`) |
+
+> **Steel — native fallback that defers to your modpack.** Locks Reforged ships its own steel material so the steel tier is fully craftable in a locks-only install: blast an iron ingot or smelt steel ore into a Steel Ingot, plus ingot↔nugget conversions. Native Steel Ore generates uncommonly underground in ordinary Overworld biomes.
+>
+> Because the material lives in the standard **`forge:ingots/steel`, `forge:nuggets/steel`, `forge:ores/steel`** tags, steel from other mods (Create, Immersive Engineering, Mekanism, Thermal, …) works interchangeably in every Locks recipe. When your pack already has a steel economy, Locks **detects it and steps aside** — it stops generating its ore and stops offering redundant steel-production recipes, letting the other mod (or a unification mod) own steel. Detection inspects the *members* of the steel tags and ignores Locks' own entries, so its ingot never masks a real external provider. Each form is handled independently: a mod that adds steel ingots but no nuggets still gets Locks' nugget as a missing-form fallback.
+>
+> **The native blocks and items stay registered under stable IDs in every mode** — existing worlds and stacks always remain valid; only *acquisition* (ore generation, production recipes, creative-tab presentation) is toggled. Disabled native steel is still obtainable via `/give` for recovery.
+>
+> **`Steel Material Mode`** (server config) overrides the automatic behavior:
+> - `AUTO` *(default)* — provide each native form only when no other mod supplies it; generate native ore only when no foreign steel ore exists.
+> - `FORCE_NATIVE` — keep Locks' native steel recipes and ore generation on even alongside an external provider.
+> - `EXTERNAL_ONLY` — never enable native acquisition or generation, even if the steel tags are empty (a warning names any missing form).
+>
+> Changing the mode may need a `/reload` (recipes) and a world reload (ore generation). Locks never hardcodes a specific mod's item — everything keys off the Forge tags. **Modpack authors:** if your chosen steel mod does *not* register its steel into `forge:ingots/steel` / `forge:nuggets/steel` / `forge:ores/steel`, add a small datapack tag entry so Locks can see it (or set `FORCE_NATIVE` / `EXTERNAL_ONLY` to decide explicitly).
 
 ### Lock Picking Minigame
 An interactive lock picking mechanic with a pin-matching system. Each lock has a unique combination based on its complexity. Higher-tier lock picks are more effective against tougher locks.

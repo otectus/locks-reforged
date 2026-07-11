@@ -1,5 +1,12 @@
 {
 	"type": "minecraft:crafting_shaped",
+	"conditions":
+	[
+		{
+			"type": "locks:steel",
+			"query": "steel_available"
+		}
+	],
 	"pattern":
 	[
 		" D ",

@@ -1,5 +1,12 @@
 {
 	"type": "minecraft:crafting_shaped",
+	"conditions":
+	[
+		{
+			"type": "locks:steel",
+			"query": "steel_available"
+		}
+	],
 	"pattern":
 	[
 		" SS",
@@ -15,7 +22,7 @@
 	},
 	"result":
 	{
-		"item": "locks:iron_lock_pick",
+		"item": "locks:steel_lock_pick",
 		"count": 2
 	}
 }

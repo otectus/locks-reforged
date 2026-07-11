@@ -26,6 +26,9 @@ import melonslise.locks.common.network.toclient.AddLockableToChunkPacket;
 import melonslise.locks.common.init.LocksTagHelper;
 import melonslise.locks.common.init.LockStatsReloadListener;
 import melonslise.locks.common.init.LocksSoundEvents;
+import melonslise.locks.common.steel.NativeSteelPolicy;
+import melonslise.locks.common.steel.NativeSteelState;
+import melonslise.locks.common.steel.SteelMaterialMode;
 import melonslise.locks.common.item.KeyRingItem;
 import melonslise.locks.common.item.LockItem;
 import melonslise.locks.common.item.LockPickItem;
@@ -73,6 +76,7 @@ import net.minecraftforge.event.village.WandererTradesEvent;
 import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.event.level.ChunkEvent;
 import net.minecraftforge.event.level.LevelEvent;
+import net.minecraftforge.event.TagsUpdatedEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.Event;
 import net.minecraftforge.eventbus.api.EventPriority;
@@ -131,6 +135,40 @@ public final class LocksForgeEvents
 	public static void onServerStopped(ServerStoppedEvent e)
 	{
 		LootValueCalculator.clearCache();
+		// Drop the steel snapshot so a stale state never leaks into the next world/server session.
+		NativeSteelPolicy.clear();
+	}
+
+	/**
+	 * Refresh the native-steel compatibility snapshot whenever tags are (re)loaded, and log a single diagnostic
+	 * summary. Only the authoritative server-data load recomputes the snapshot and logs; the client packet update
+	 * refreshes the snapshot too (so the client-side creative tab reflects the server), but never logs.
+	 */
+	@SubscribeEvent
+	public static void onTagsUpdated(TagsUpdatedEvent e)
+	{
+		SteelMaterialMode mode = LocksServerConfig.SPEC.isLoaded()
+			? LocksServerConfig.STEEL_MATERIAL_MODE.get()
+			: SteelMaterialMode.AUTO;
+		NativeSteelState state = NativeSteelPolicy.refresh(e.getRegistryAccess(), mode);
+
+		if (e.getUpdateCause() != TagsUpdatedEvent.UpdateCause.SERVER_DATA_LOAD)
+			return;
+
+		Locks.LOGGER.info("Steel material mode: {}", mode);
+		Locks.LOGGER.info("Foreign ingots: {}", state.foreignIngots());
+		Locks.LOGGER.info("Foreign nuggets: {}", state.foreignNuggets());
+		Locks.LOGGER.info("Foreign ores: {}", state.foreignOres());
+		Locks.LOGGER.info("Locks native fallback: ingot={}, nugget={}, oreGeneration={}",
+			state.nativeIngotActive(), state.nativeNuggetActive(), state.nativeOreActive());
+
+		if (mode == SteelMaterialMode.EXTERNAL_ONLY)
+		{
+			List<String> missing = NativeSteelPolicy.missingForms(state);
+			if (!missing.isEmpty())
+				Locks.LOGGER.warn("Steel Material Mode is EXTERNAL_ONLY but no steel provider supplies: {}. "
+					+ "Affected Locks recipes will be uncraftable until a mod/datapack populates the forge steel tags.", missing);
+		}
 	}
 
 	private static final Gson LOOT_GSON = net.minecraft.world.level.storage.loot.Deserializers.createLootTableSerializer().create();
