@@ -38,6 +38,7 @@ import melonslise.locks.common.item.LockingItem;
 import melonslise.locks.common.util.Lockable;
 import melonslise.locks.common.util.LocksThreadUtil;
 import melonslise.locks.common.util.LocksUtil;
+import melonslise.locks.common.util.PassiveLockPolicy;
 import melonslise.locks.common.util.LootValueCalculator;
 import melonslise.locks.common.util.ShockingHelper;
 import net.minecraft.resources.ResourceLocation;
@@ -419,6 +420,7 @@ public final class LocksForgeEvents
 		if(locked != null)
 		{
 			Lockable lkb = locked;
+			boolean yieldToBlock = false;
 			e.setUseBlock(Event.Result.DENY);
 			e.setUseItem(Event.Result.DENY);
 
@@ -519,35 +521,54 @@ public final class LocksForgeEvents
 			}
 			else
 			{
-				// Check Awareness enchantment: scan all locked lockables for one owned by this player
+				// Awareness: a lock does not apply to the player who placed it. An ordinary click is handed
+				// straight to the block and never touches the lock, so the chest or door opens while staying
+				// shut to everyone else; sneaking is the one gesture that acts on the lock itself.
+				//
+				// Both tallies are taken before anything is mutated, so the client and the server decide
+				// identically and neither can be steered by the order of the list.
 				boolean awarenessHandled = false;
-				if (LocksServerConfig.ENABLE_AWARENESS.get())
+				boolean anyOwnedLocked = false, everyLockedOwned = true;
+				for (Lockable l : intersect)
 				{
-					for (Lockable candidate : intersect)
+					if (!l.lock.isLocked())
+						continue;
+					if (LocksUtil.ownsAwareness(l, player))
+						anyOwnedLocked = true;
+					else
+						everyLockedOwned = false;
+				}
+				if (anyOwnedLocked)
+				{
+					PassiveLockPolicy.Action action = PassiveLockPolicy.onOwnedLocked(player.isShiftKeyDown(), stack.isEmpty(), everyLockedOwned);
+					if (action == PassiveLockPolicy.Action.UNLOCK)
 					{
-						if (!candidate.lock.isLocked()) continue;
-						if (EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.AWARENESS.get(), candidate.stack) <= 0) continue;
-						java.util.UUID owner = LockItem.getOwner(candidate.stack);
-						if (owner != null && owner.equals(player.getUUID()))
-						{
-							world.playSound(player, pos, LocksSoundEvents.LOCK_OPEN.get(), SoundSource.BLOCKS, 1f, 1f);
-							if (!world.isClientSide)
-								for (Lockable l : intersect)
+						world.playSound(player, pos, LocksSoundEvents.LOCK_OPEN.get(), SoundSource.BLOCKS, 1f, 1f);
+						if (!world.isClientSide)
+							for (Lockable l : intersect)
+								if (LocksUtil.ownsAwareness(l, player) && l.lock.isLocked())
 								{
-									java.util.UUID lOwner = LockItem.getOwner(l.stack);
-									if (lOwner != null && lOwner.equals(player.getUUID())
-										&& EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.AWARENESS.get(), l.stack) > 0)
-									{
-										boolean wasLocked = l.lock.isLocked();
-										LocksUtil.setLocked(world, l, !wasLocked, player);
-										if (wasLocked)
-											LocksUtil.resolveLootTables(world, l, player);
-									}
+									// Explicit false, never a toggle: toggling per lockable would LOCK an
+									// already-open lock of the player's own that overlaps this block, which is
+									// its own endless flip-flop.
+									LocksUtil.setLocked(world, l, false, player);
+									LocksUtil.resolveLootTables(world, l, player);
 								}
-							awarenessHandled = true;
-							break;
-						}
+						awarenessHandled = true;
 					}
+					else if (action == PassiveLockPolicy.Action.PASS_THROUGH)
+					{
+						// The lock is deliberately left alone. resolveLootTables is idempotent and keeps a
+						// generated loot chest unpacking on the owner's first access, as it did before.
+						if (!world.isClientSide)
+							for (Lockable l : intersect)
+								if (LocksUtil.ownsAwareness(l, player))
+									LocksUtil.resolveLootTables(world, l, player);
+						awarenessHandled = true;
+						yieldToBlock = true;
+					}
+					// NONE falls through: somebody else's lock is still shut here, and it is that lock
+					// doing the denying.
 				}
 				if (!awarenessHandled)
 				{
@@ -628,6 +649,18 @@ public final class LocksForgeEvents
 				}
 			}
 
+			// The owner cannot stop presenting an Awareness credential, so this click must not be spent
+			// purely on the lock or the block could never be opened at all. Hand its own interaction back
+			// to vanilla: DEFAULT rather than ALLOW, so a sneak-place still behaves normally, and useItem
+			// stays DENY so the click opens the chest or door but can never place or consume what is held.
+			// No swing — vanilla swings from the InteractionResult. Returns before the lock-removal branch
+			// so one click cannot both open the chest and pry the lock off it.
+			if(yieldToBlock)
+			{
+				e.setUseBlock(Event.Result.DEFAULT);
+				return;
+			}
+
 			player.swing(InteractionHand.MAIN_HAND);
 			e.setCancellationResult(InteractionResult.SUCCESS);
 			e.setCanceled(true);
@@ -637,6 +670,9 @@ public final class LocksForgeEvents
 		{
 			// All lockables at this position are unlocked — handle re-locking
 			boolean relocked = false;
+			// Passive credentials stand aside for the lock-removal gesture below instead of swallowing it.
+			boolean removalGesture = PassiveLockPolicy.isRemovalGesture(
+				LocksServerConfig.ALLOW_REMOVING_LOCKS.get(), player.isShiftKeyDown(), stack.isEmpty());
 
 			if(stack.getItem() == LocksItems.MASTER_KEY.get())
 			{
@@ -701,32 +737,12 @@ public final class LocksForgeEvents
 				}
 			}
 
-			if(!relocked && LocksServerConfig.ENABLE_AWARENESS.get())
-			{
-				for(Lockable candidate : intersect)
-				{
-					if(EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.AWARENESS.get(), candidate.stack) <= 0) continue;
-					java.util.UUID owner = LockItem.getOwner(candidate.stack);
-					if(owner != null && owner.equals(player.getUUID()))
-					{
-						e.setUseBlock(Event.Result.DENY);
-						e.setUseItem(Event.Result.DENY);
-						world.playSound(player, pos, LocksSoundEvents.LOCK_CLOSE.get(), SoundSource.BLOCKS, 1f, 1f);
-						if(!world.isClientSide)
-							for(Lockable l : intersect)
-							{
-								java.util.UUID lOwner = LockItem.getOwner(l.stack);
-								if(lOwner != null && lOwner.equals(player.getUUID())
-									&& EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.AWARENESS.get(), l.stack) > 0)
-									LocksUtil.setLocked(world, l, true, player);
-							}
-						relocked = true;
-						break;
-					}
-				}
-			}
+			// No Awareness re-lock branch here on purpose. An owner's plain click already passes through
+			// to the block, and sneaking with an empty hand belongs to lock removal below — claiming it
+			// here is what made an owner's own lock impossible to take off. Re-lock by picking the lock
+			// up and placing it again; a placed lock is locked.
 
-			if(!relocked)
+			if(!relocked && !removalGesture)
 			{
 				for(Lockable candidate : intersect)
 				{
@@ -833,9 +849,11 @@ public final class LocksForgeEvents
 		select.set(null);
 	}
 
+	// lockedAgainst, not locked: an Awareness lock does not apply to its owner, and since it now never
+	// unlocks through ordinary use they would otherwise never be able to break their own block.
 	public static boolean canBreakLockable(Player player, BlockPos pos)
 	{
-		return !LocksServerConfig.PROTECT_LOCKABLES.get() || player.isCreative() || !LocksUtil.locked(player.level(), pos);
+		return !LocksServerConfig.PROTECT_LOCKABLES.get() || player.isCreative() || !LocksUtil.lockedAgainst(player.level(), pos, player);
 	}
 
 	@SubscribeEvent

@@ -9,8 +9,12 @@ import net.minecraft.util.RandomSource;
 import javax.annotation.Nullable;
 
 import melonslise.locks.common.config.LocksConfig;
+import melonslise.locks.common.config.LocksServerConfig;
 import melonslise.locks.common.init.LocksCapabilities;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import melonslise.locks.common.init.LocksEnchantments;
+import melonslise.locks.common.item.LockItem;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.LevelAccessor;
@@ -119,6 +123,30 @@ public final class LocksUtil
 	public static boolean locked(Level world, BlockPos pos)
 	{
 		return intersecting(world, pos).anyMatch(LocksPredicates.LOCKED);
+	}
+
+	// Whether this player placed this lock and it carries Awareness. One definition, shared by the
+	// interaction handler, break protection and the Carry On compat, so the three cannot drift.
+	public static boolean ownsAwareness(Lockable lockable, Player player)
+	{
+		if(!LocksServerConfig.ENABLE_AWARENESS.get())
+			return false;
+		if(EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.AWARENESS.get(), lockable.stack) <= 0)
+			return false;
+		java.util.UUID owner = LockItem.getOwner(lockable.stack);
+		return owner != null && owner.equals(player.getUUID());
+	}
+
+	// Whether this position is locked AGAINST this particular player: some lock here is shut and is not
+	// one of their own Awareness locks. An Awareness lock does not apply to its owner, so it neither
+	// blocks their interaction nor protects the block from them.
+	//
+	// Only player-facing checks use this. Everything without a player behind it — the door guard, the
+	// hopper and container capability vetoes, pistons, explosions, redstone — keeps using locked(), so
+	// an owner's door still stops villagers.
+	public static boolean lockedAgainst(Level world, BlockPos pos, Player player)
+	{
+		return intersecting(world, pos).anyMatch(lkb -> lkb.lock.isLocked() && !ownsAwareness(lkb, player));
 	}
 
 	// Physically closes every open door inside bb. Server-side only.

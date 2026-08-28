@@ -2,6 +2,15 @@
 
 ## 1.7.2
 
+### Awareness locks no longer shut their own owner out
+
+- **Fixed an Awareness lock making its block permanently unusable for the player who placed it.** Every branch that recognised the owner also cancelled the interaction, so the click that opened the lock never reached the chest, and the next click silently re-locked it. Unlock, re-lock, unlock, re-lock — the chest never opened, and because the re-lock ran first the lock could not be taken off either. Reported as *"I could open the lock but not open the chest or remove the lock"*.
+- **An Awareness lock now simply does not apply to its owner.** An ordinary right-click opens the chest or door and leaves the lock completely alone, so it stays shut to everyone else — the block is never left open behind you. Sneak + right-click with an empty hand is the gesture that acts on the lock: it opens a locked one, and once open the usual sneak-with-an-empty-hand gesture takes it off. Put the lock back on to re-lock it.
+- Owners can now also break their own Awareness-locked block in survival, which the old behaviour made impossible because the lock was never open.
+- The transparency applies only to the owner's own interactions. Hoppers, pistons, explosions, redstone and door-opening AI still see the lock as locked, so an Awareness door keeps villagers out **even for its owner** — better than leaving it unlocked would have been.
+- Fixed a second latent flip-flop in the same code: the unlock loop toggled each lock individually, so where two of your own locks overlapped and one was already open, opening the other *closed* that one.
+- Fixed a worn Curios key ring swallowing the sneak-with-an-empty-hand gesture, which stopped an unlocked lock from being removed in the same way.
+
 ### Locked doors now stop villagers and other door-opening AI
 - **Fixed villagers walking straight through a locked door.** Lock enforcement ran on the player interaction event and on redstone, but mob AI does not simulate a right-click — it drives the door through Minecraft's own entity-facing door API, which nothing guarded. Locks now guard that method directly, so vanilla villagers, other door-opening mobs, raiders, and modded AI that operates a vanilla or subclassed `DoorBlock` are all covered by the same "is this locked" check every other protection already used.
   - Closing a locked door is still allowed — only opening is refused. Nothing is done beyond refusing: no sound, no game event, no interference with pathing or AI memory, because AI retries constantly and any feedback there would be spam.

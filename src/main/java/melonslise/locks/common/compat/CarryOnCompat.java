@@ -9,6 +9,7 @@ import melonslise.locks.common.item.KeyRingItem;
 import melonslise.locks.common.item.LockItem;
 import melonslise.locks.common.item.LockingItem;
 import melonslise.locks.common.util.Lockable;
+import melonslise.locks.common.util.LocksUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -97,13 +98,8 @@ public final class CarryOnCompat
 			return true;
 
 		// Awareness: the player who placed the lock can carry it without a key.
-		if (LocksServerConfig.ENABLE_AWARENESS.get()
-			&& EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.AWARENESS.get(), lkb.stack) > 0)
-		{
-			UUID owner = LockItem.getOwner(lkb.stack);
-			if (owner != null && owner.equals(player.getUUID()))
-				return true;
-		}
+		if (LocksUtil.ownsAwareness(lkb, player))
+			return true;
 
 		// Curios key rings (worn in a curio slot rather than the main inventory).
 		if (curiosLoaded && !CuriosCompat.findMatchingKeyRing(player, id).isEmpty())

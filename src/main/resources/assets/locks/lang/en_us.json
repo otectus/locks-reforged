@@ -42,7 +42,7 @@
 	"enchantment.locks.reinforced": "Reinforced",
 	"enchantment.locks.reinforced.desc": "Increases the lock's explosion resistance",
 	"enchantment.locks.awareness": "Awareness",
-	"enchantment.locks.awareness.desc": "Remembers its owner; they can open it without a key",
+	"enchantment.locks.awareness.desc": "Remembers its owner; the block opens for them while staying locked. Sneak to unlock",
 	"enchantment.locks.finesse": "Finesse",
 	"enchantment.locks.finesse.desc": "Reduces the chance that lock picks break after a wrong pin",
 	"enchantment.locks.attunement": "Attunement",

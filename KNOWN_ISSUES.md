@@ -4,6 +4,20 @@
 
 1. **Refmap warning in dev**: The mixin refmap (`locks.refmap.json`) shows "could not be read" in the dev environment. This is a known MixinGradle/ForgeGradle cosmetic issue — dev uses official (Mojang) names which match source annotations directly, so no remapping is needed. The refmap IS correctly included in the production JAR. No fix required.
 
+## Awareness Owner Lockout (fixed in 1.7.2)
+
+An Awareness lock used to make its block permanently unusable for the player who placed it: the LOCKED interaction path denies and cancels the click unconditionally before any authorization branch runs, and the UNLOCKED path's Awareness branch checked only the lock's enchantment and owner UUID — not the held item, not aim, not sneaking — so it fired on every click and re-locked immediately. The chest GUI could never open, and because that branch set `relocked` it also returned before the lock-removal branch, so the lock could not be taken off.
+
+**The general shape:** this is what happens to any credential the player cannot put away. A held key escapes because both toggle branches gate on the held stack — stow it and the block behaves normally. Awareness has no off switch at all, so any design where it claims every right-click leaves no click that opens the block.
+
+**An aim gate cannot fix it, and this was verified rather than assumed.** For a vanilla chest, `Lockable.State` places the lock model's clickable box (after `inflate(1/32)`) at x ∈ [0.344, 0.656], y ∈ [0.219, 0.656], against a front face spanning [0.0625, 0.9375] × [0, 0.875] — centred on the face, covering about 36% × 50% of it. "Aim at the padlock" and "aim at the chest" are the same crosshair position, so gating a lock action on aim reintroduces the lockout for the most common way to click a chest. **Do not add aim-based lock gestures.** Sneak is the only unambiguous modifier.
+
+**Resolution:** an Awareness lock does not apply to its owner. An ordinary click passes straight through to the block and never touches lock state; sneak + right-click with an empty hand unlocks; the existing sneak-with-an-empty-hand removal gesture then takes the open lock off. The rules live in `common/util/PassiveLockPolicy` as plain booleans and are unit-tested, including a regression test asserting that no combination of inputs leaves an owner with no click that reaches their own block. Handing the click back is done with `setUseBlock(DEFAULT)` while `setUseItem` stays `DENY`, so the block opens but the held item can never be placed or consumed; it is gated on every locked lockable at the position being the owner's own, since the container GUI is otherwise protected solely by this handler denying the click.
+
+**Deliberate consequence:** an owner who opens their own Awareness-locked **door** leaves it physically open while the lock still reports locked, so a villager can path through the open doorway until it closes. The "locked implies closed" invariant is enforced on transitions *to* locked, not continuously, and a player opening their own door is not a transition. No worse than any door left open, and better than the alternative reading, where the door would be left unlocked as well.
+
+**Verified:** 8 pure-logic policy tests (61 in the suite overall), `clean build` clean. In-game behaviour is manual and is listed in the 1.7.2 script below.
+
 ## Villager-Proof Doors (new in 1.7.2)
 
 Locked doors are now guarded at `DoorBlock#setOpen`, the method every non-player door opener funnels through — the villager Brain behavior, the legacy `DoorInteractGoal`, raider goals, and modded AI driving a vanilla or subclassed `DoorBlock`.
@@ -55,6 +69,19 @@ Server option **Allow Itemless Lock Picking**, default `false`. When on, an empt
 ## 1.7.2 Manual QA Script (NOT YET RUN)
 
 None of the following has been executed. Run before release and tick individually.
+
+**Awareness owner (the 1.7.2 lockout fix)**
+- [ ] Awareness lock on a chest, empty hand, crosshair on the chest centre → one click opens the chest, and the lock still reads locked *(the reported bug)*
+- [ ] Same holding a torch, not sneaking → chest opens, torch not placed
+- [ ] Sneak + right-click the locked lock with an empty hand → lock opens, chest does **not** open
+- [ ] Sneak + empty hand on the now-unlocked lock → lock drops as an item; place it back → locked again
+- [ ] Sneak + torch beside your own locked chest → chest is not unlocked
+- [ ] Break your own Awareness-locked chest in survival → allowed
+- [ ] Door: one click opens it; sneak + empty hand unlocks it; villagers still cannot open it while it is locked and closed
+- [ ] Your lock **plus a stranger's locked lock** on one chest → your click does not open it, and sneaking opens only yours
+- [ ] Second player without Awareness → rattle, shock and minigame all unchanged
+- [ ] `Enable Awareness = false` → owner treated as a stranger throughout
+- [ ] Worn Curios key ring + sneak + empty hand on an unlocked lock → the lock is removed, not re-locked
 
 **Doors**
 - [ ] Villager cannot open a locked oak door; place a villager, a POI and a locked door between them and let it run — the door never reaches `OPEN=true`, no sound spam, tick time stable

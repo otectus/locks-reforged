@@ -64,7 +64,7 @@ Carry a **Key Ring** to hold many keys at once — it opens any lock whose key i
 - **Silent** — Suppresses the rattle sound when access is denied
 - **Auto-Pick** — Chance to instantly open the lock, bypassing the minigame
 - **Reinforced** — Increases explosion resistance per level
-- **Awareness** — Remembers who placed the lock; that player can open it without a key
+- **Awareness** — The lock does not apply to whoever placed it: the block opens for them normally while staying locked to everyone else. Sneak + right-click with an empty hand to unlock it
 
 **Lock pick enchantments** — go on the pick, and provide counterplay (new in 1.7.0):
 - **Finesse** — Reduces the chance a pick breaks after a wrong pin (counters Sturdy)

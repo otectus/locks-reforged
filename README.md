@@ -70,7 +70,7 @@ Beyond a single key:
 
 - A **Key Ring** holds many keys at once; carrying it opens any lock whose key is inside. With Curios installed it also works from a curio slot, without occupying your hand.
 - A **Master Key** opens any lock, regardless of ID.
-- The **Awareness** enchantment binds a lock to whoever placed it, letting that player open it with no key at all.
+- The **Awareness** enchantment binds a lock to whoever placed it. That lock then does not apply to them at all: an ordinary right-click opens the chest or door and leaves the lock untouched, so it stays shut to everyone else and is never left open behind you. Sneak + right-click with an empty hand opens the lock itself; sneak again on the open lock to take it off.
 
 ### Lock Picking Minigame
 An interactive lock picking mechanic with a pin-matching system. Each lock has a unique combination based on its complexity. Higher-tier lock picks are more effective against tougher locks.
@@ -91,7 +91,7 @@ Locks define resistance; lock picks define technique. **Lock enchantments** go o
 | **Silent** | I | Suppresses the rattle sound when access is denied. Incompatible with Shocking |
 | **Auto-Pick** | III | 10%/20%/30% chance to instantly open the lock, bypassing the minigame. Incompatible with Complexity |
 | **Reinforced** | III | Increases explosion resistance by 50%/100%/150%. Protects against TNT and creepers |
-| **Awareness** | I | Remembers who placed the lock; that player can open it without a key |
+| **Awareness** | I | The lock does not apply to whoever placed it — the block opens for them while staying locked to everyone else. Sneak + right-click with an empty hand to unlock it |
 
 **Lock pick enchantments** (applied to lock picks — counterplay to the lock enchantments; new in 1.7.0):
 
@@ -117,7 +117,7 @@ A configurable villager profession (default toolsmith) sells lock picks and lock
 Lock picks and lock mechanisms can be found in dungeon, temple, and other structure chests.
 
 ### Protection Features
-- Locked doors cannot be opened by villagers or other door-opening AI
+- Locked doors cannot be opened by villagers or other door-opening AI — including on a lock's own owner's door, which stays shut to them
 - Locked blocks resist redstone activation
 - Locked containers block hopper extraction
 - Locked blocks resist piston movement
