@@ -73,6 +73,7 @@ public class LocksServerConfig
 	public static final ForgeConfigSpec.BooleanValue SHOCKING_ON_BLOCK_BREAK_ATTEMPT;
 
 	public static final ForgeConfigSpec.BooleanValue NETHERITE_PICK_UNBREAKABLE;
+	public static final ForgeConfigSpec.BooleanValue ALLOW_ITEMLESS_LOCK_PICKING;
 
 	public static final ForgeConfigSpec.ConfigValue<List<? extends String>> LOOT_TABLE_PATTERNS;
 
@@ -248,6 +249,13 @@ public class LocksServerConfig
 		NETHERITE_PICK_UNBREAKABLE = cfg
 			.comment("When enabled, netherite lock picks never lose durability or break during lock picking")
 			.define("Netherite Lockpick Unbreakable", false);
+
+		ALLOW_ITEMLESS_LOCK_PICKING = cfg
+			.comment("Allow players to pick locked blocks with an empty main hand.",
+				"Itemless attempts use the normal pin minigame but never consume an item,",
+				"bypass lock-pick strength/Complexity requirements, and reset progress on a wrong pin.",
+				"This does not remove lock-pick items, recipes, loot, trades, or enchantments.")
+			.define("Allow Itemless Lock Picking", false);
 
 		LOOT_TABLE_PATTERNS = cfg
 			.comment("Loot tables matching these patterns will receive lock pick / key loot injection.",

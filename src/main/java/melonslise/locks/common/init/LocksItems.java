@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import melonslise.locks.Locks;
+import melonslise.locks.common.item.KeyBlankItem;
 import melonslise.locks.common.item.KeyItem;
 import melonslise.locks.common.item.KeyRingItem;
 import melonslise.locks.common.item.LockItem;
@@ -32,7 +33,7 @@ public final class LocksItems
 		// never empty in a vanilla-only install; external steel mods merge into the same tags.
 		STEEL_INGOT = ITEMS.register("steel_ingot", () -> new Item(new Item.Properties())),
 		STEEL_NUGGET = ITEMS.register("steel_nugget", () -> new Item(new Item.Properties())),
-		KEY_BLANK = ITEMS.register("key_blank", () -> new Item(new Item.Properties())),
+		KEY_BLANK = ITEMS.register("key_blank", () -> new KeyBlankItem(new Item.Properties())),
 		KEY = ITEMS.register("key", () -> new KeyItem(new Item.Properties())),
 		MASTER_KEY = ITEMS.register("master_key", () -> new MasterKeyItem(new Item.Properties())),
 		KEY_RING = ITEMS.register("key_ring", () -> new KeyRingItem(1, new Item.Properties()));

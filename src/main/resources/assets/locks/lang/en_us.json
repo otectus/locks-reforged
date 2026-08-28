@@ -72,7 +72,10 @@
 	"locks.tooltip.length":  "Length: %s",
 	"locks.tooltip.strength": "Strength: %s",
 	"locks.tooltip.owned": "Aware (Owner-Bound)",
+	"locks.tooltip.key_blank.pair": "Craft with an unplaced lock to make its key",
+	"locks.tooltip.key_blank.copy": "Craft with a paired key to make a copy",
 
 	"locks.status.locked": "This block is locked",
-	"locks.status.too_complex": "This lock is too complex for this lock pick"
+	"locks.status.too_complex": "This lock is too complex for this lock pick",
+	"locks.status.key_blank_pairing": "Pair this blank with the lock item in a crafting grid before placing the lock"
 }

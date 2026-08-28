@@ -16,6 +16,7 @@ import melonslise.locks.common.init.LockTypeRegistry;
 import melonslise.locks.common.util.Cuboid6i;
 import melonslise.locks.common.util.Lock;
 import melonslise.locks.common.util.Lockable;
+import melonslise.locks.common.util.LocksUtil;
 import melonslise.locks.common.util.Transform;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.ChestBlock;
@@ -136,8 +137,13 @@ public class LockItem extends LockingItem
 			ILockableHandler handler = world.getCapability(LocksCapabilities.LOCKABLE_HANDLER).orElse(null);
 			if (handler == null)
 				return InteractionResult.PASS;
-			if (!handler.add(new Lockable(new Cuboid6i(pos1, pos), Lock.from(stack), Transform.fromDirection(ctx.getClickedFace(), player.getDirection().getOpposite()), lockStack, world)))
+			Lockable lockable = new Lockable(new Cuboid6i(pos1, pos), Lock.from(stack), Transform.fromDirection(ctx.getClickedFace(), player.getDirection().getOpposite()), lockStack, world);
+			if (!handler.add(lockable))
 				return InteractionResult.PASS;
+			// A lock placed on an already-open door must not leave it open: enforce the same
+			// "locked implies closed" invariant the unlock/re-lock paths go through.
+			if (lockable.lock.isLocked())
+				LocksUtil.closeDoors(world, lockable.bb, player);
 			world.playSound(null, pos, LocksSoundEvents.LOCK_CLOSE.get(), SoundSource.BLOCKS, 1f, 1f);
 			if (!player.isCreative())
 				stack.shrink(1);
@@ -179,8 +185,13 @@ public class LockItem extends LockingItem
 		ILockableHandler handler = world.getCapability(LocksCapabilities.LOCKABLE_HANDLER).orElse(null);
 		if (handler == null)
 			return InteractionResult.PASS;
-		if (!handler.add(new Lockable(new Cuboid6i(pos, pos1), Lock.from(stack), Transform.fromDirection(ctx.getClickedFace(), player.getDirection().getOpposite()), lockStack, world)))
+		Lockable lockable = new Lockable(new Cuboid6i(pos, pos1), Lock.from(stack), Transform.fromDirection(ctx.getClickedFace(), player.getDirection().getOpposite()), lockStack, world);
+		if (!handler.add(lockable))
 			return InteractionResult.PASS;
+		// A lock placed on an already-open door must not leave it open: enforce the same
+		// "locked implies closed" invariant the unlock/re-lock paths go through.
+		if (lockable.lock.isLocked())
+			LocksUtil.closeDoors(world, lockable.bb, player);
 		world.playSound(null, pos, LocksSoundEvents.LOCK_CLOSE.get(), SoundSource.BLOCKS, 1f, 1f);
 		if (!player.isCreative())
 			stack.shrink(1);

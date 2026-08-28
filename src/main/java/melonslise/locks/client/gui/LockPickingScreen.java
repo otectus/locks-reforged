@@ -17,6 +17,7 @@ import melonslise.locks.client.gui.sprite.action.IAction;
 import melonslise.locks.client.gui.sprite.action.MoveAction;
 import melonslise.locks.client.gui.sprite.action.WaitAction;
 import melonslise.locks.common.container.LockPickingContainer;
+import melonslise.locks.common.container.LockPickingMode;
 import melonslise.locks.common.init.LocksNetwork;
 import melonslise.locks.common.network.toserver.TryPinPacket;
 import net.minecraft.client.Minecraft;
@@ -69,6 +70,7 @@ public class LockPickingScreen extends AbstractContainerScreen<LockPickingContai
 	public final int length;
 	public final boolean pins[];
 	public final InteractionHand hand;
+	public final LockPickingMode mode;
 
 	protected int currPin;
 
@@ -80,6 +82,7 @@ public class LockPickingScreen extends AbstractContainerScreen<LockPickingContai
 		this.length = cont.lockable.lock.getLength();
 		this.pins = new boolean[this.length];
 		this.hand = cont.hand;
+		this.mode = cont.mode;
 		this.lockTex = getTextureFor(cont.lockable.stack);
 		this.imageWidth = (FRONT_WALL_TEX.width + this.length * (COLUMN_TEX.width + INNER_WALL_TEX.width)) * 2;
 		this.imageHeight = HANDLE_TEX.height * 2;
@@ -267,10 +270,16 @@ public class LockPickingScreen extends AbstractContainerScreen<LockPickingContai
 		else
 			this.upperPins[this.currPin].execute(MoveAction.at(0f, 6f).time(2));
 		if(reset)
-			this.reset();
+		{
+			if(this.mode == LockPickingMode.ITEMLESS)
+				this.resetIntact();
+			else
+				this.reset();
+		}
 	}
 
-	public void reset()
+	// Shared by both failure animations so they cannot drift apart.
+	protected void clearSolvedPins()
 	{
 		this.lockPick.speedX = 0;
 		//this.lockPick.reset();
@@ -280,6 +289,21 @@ public class LockPickingScreen extends AbstractContainerScreen<LockPickingContai
 				this.pins[a] = false;
 				this.upperPins[a].execute(MoveAction.to(this.upperPins[a], this.upperPins[a].posX, this.pinTumblers[a].posY - UPPER_PIN_TEX.height, 2));
 			}
+	}
+
+	// An itemless miss drops the solved pins, but nothing broke, so the tool is withdrawn and re-inserted
+	// intact rather than snapping in half.
+	public void resetIntact()
+	{
+		this.clearSolvedPins();
+		this.frozen = true;
+		this.resetPick();
+	}
+
+	// A physical pick actually broke: split it and slide the replacement in.
+	public void reset()
+	{
+		this.clearSolvedPins();
 		this.lockPick.alpha(0f);
 		this.rightPickPart.alpha(1f).execute(WaitAction.ticks(10), FadeAction.to(this.rightPickPart, 0f, 4));
 		this.leftPickPart.alpha(1f).execute(WaitAction.ticks(10), FadeAction.to(this.leftPickPart, 0f, 4).then(resetPickCb));
@@ -288,7 +312,10 @@ public class LockPickingScreen extends AbstractContainerScreen<LockPickingContai
 
 	public void resetPick()
 	{
-		this.pickTex = getTextureFor(Minecraft.getInstance().player.getItemInHand(this.hand), DEFAULT_PICK_TEXTURE);
+		// Itemless sessions have no item to look up, so the default pick art is the virtual tool.
+		this.pickTex = this.mode == LockPickingMode.ITEMLESS
+			? DEFAULT_PICK_TEXTURE
+			: getTextureFor(Minecraft.getInstance().player.getItemInHand(this.hand), DEFAULT_PICK_TEXTURE);
 		this.lockPick.position(-22 - LOCK_PICK_TEX.width, this.lockPick.posY).alpha(1f).execute(AccelerateAction.to(32f, 0f, 4, false).then(unfreezeCb));
 	}
 }

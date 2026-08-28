@@ -13,7 +13,9 @@ import net.minecraftforge.network.simple.SimpleChannel;
 
 public final class LocksNetwork
 {
-	private static final String PROTOCOL_VERSION = "2";
+	// Bumped for 1.7.2: the lock-picking menu payload gained a mode byte. Both acceptors are exact-match,
+	// so a mixed 1.7.1/1.7.2 connection is refused at the channel handshake instead of decoding bad state.
+	private static final String PROTOCOL_VERSION = "3";
 	public static final SimpleChannel MAIN = NetworkRegistry.newSimpleChannel(new ResourceLocation(Locks.ID, "main"), () -> PROTOCOL_VERSION, PROTOCOL_VERSION::equals, PROTOCOL_VERSION::equals);
 
 	private LocksNetwork() {}

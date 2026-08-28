@@ -2,6 +2,7 @@ package melonslise.locks.common.event;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.OptionalInt;
 import java.util.Optional;
 
 import com.google.gson.Gson;
@@ -18,6 +19,7 @@ import melonslise.locks.common.config.LocksClientConfig;
 import melonslise.locks.common.config.LocksServerConfig;
 import melonslise.locks.common.container.KeyRingContainer;
 import melonslise.locks.common.container.LockPickingContainer;
+import melonslise.locks.common.container.LockPickingMode;
 import melonslise.locks.common.init.LocksCapabilities;
 import melonslise.locks.common.init.LocksItemTags;
 import melonslise.locks.common.init.LocksItems;
@@ -91,8 +93,19 @@ import net.minecraftforge.server.ServerLifecycleHooks;
 public final class LocksForgeEvents
 {
 	public static final Component LOCKED_MESSAGE = Component.translatable(Locks.ID + ".status.locked");
+	public static final Component KEY_BLANK_PAIRING_MESSAGE = Component.translatable(Locks.ID + ".status.key_blank_pairing");
 
 	private LocksForgeEvents() {}
+
+	// Server-side menu open, shared by the physical-pick and itemless entry points. The mode is decided
+	// here, once, and shipped to the client purely so the screen renders the right tool; the client never
+	// gets to tell the server which mode it is playing.
+	private static void openPicking(Player player, Lockable lkb, LockPickingMode mode)
+	{
+		NetworkHooks.openScreen((ServerPlayer) player,
+			new LockPickingContainer.Provider(InteractionHand.MAIN_HAND, mode, lkb),
+			new LockPickingContainer.Writer(InteractionHand.MAIN_HAND, mode, lkb));
+	}
 
 	@SubscribeEvent
 	public static void attachCapabilitiesToWorld(AttachCapabilitiesEvent<Level> e)
@@ -431,13 +444,13 @@ public final class LocksForgeEvents
 					if(autoPick > 0 && !world.isClientSide && world.getRandom().nextFloat() < autoPick * 0.10f)
 					{
 						// Auto-Pick triggered: instant unlock without minigame
-						lkb.lock.setLocked(false);
+						LocksUtil.setLocked(world, lkb, false, player);
 						world.playSound(null, pos, LocksSoundEvents.LOCK_OPEN.get(), SoundSource.BLOCKS, 1f, 1f);
 						LocksUtil.resolveLootTables(world, lkb, player);
 					}
 					else if(!world.isClientSide)
 					{
-						NetworkHooks.openScreen((ServerPlayer) player, new LockPickingContainer.Provider(InteractionHand.MAIN_HAND, lkb), new LockPickingContainer.Writer(InteractionHand.MAIN_HAND, lkb));
+						openPicking(player, lkb, LockPickingMode.ITEM_BACKED);
 					}
 				}
 			}
@@ -449,7 +462,7 @@ public final class LocksForgeEvents
 					for(Lockable l : intersect)
 					{
 						boolean wasLocked = l.lock.isLocked();
-						l.lock.setLocked(!wasLocked);
+						LocksUtil.setLocked(world, l, !wasLocked, player);
 						if(wasLocked)
 							LocksUtil.resolveLootTables(world, l, player);
 					}
@@ -464,7 +477,7 @@ public final class LocksForgeEvents
 						if(l.lock.id == id)
 						{
 							boolean wasLocked = l.lock.isLocked();
-							l.lock.setLocked(!wasLocked);
+							LocksUtil.setLocked(world, l, !wasLocked, player);
 							if(wasLocked)
 								LocksUtil.resolveLootTables(world, l, player);
 						}
@@ -476,7 +489,12 @@ public final class LocksForgeEvents
 				if(inv == null) return;
 				for(int a = 0; a < inv.getSlots(); ++a)
 				{
-					int id = LockingItem.getOrSetId(inv.getStackInSlot(a));
+					// readId, not getOrSetId: an empty slot would otherwise get a random id written into
+					// ItemStack.EMPTY, whose tag is a shared singleton.
+					OptionalInt slotId = LockingItem.readId(inv.getStackInSlot(a));
+					if(slotId.isEmpty())
+						continue;
+					int id = slotId.getAsInt();
 					boolean matched = false;
 					for(Lockable l : intersect)
 					{
@@ -486,7 +504,7 @@ public final class LocksForgeEvents
 							if(!world.isClientSide)
 							{
 								boolean wasLocked = l.lock.isLocked();
-								l.lock.setLocked(!wasLocked);
+								LocksUtil.setLocked(world, l, !wasLocked, player);
 								if(wasLocked)
 									LocksUtil.resolveLootTables(world, l, player);
 							}
@@ -521,7 +539,7 @@ public final class LocksForgeEvents
 										&& EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.AWARENESS.get(), l.stack) > 0)
 									{
 										boolean wasLocked = l.lock.isLocked();
-										l.lock.setLocked(!wasLocked);
+										LocksUtil.setLocked(world, l, !wasLocked, player);
 										if (wasLocked)
 											LocksUtil.resolveLootTables(world, l, player);
 									}
@@ -541,7 +559,12 @@ public final class LocksForgeEvents
 						if (curioInv == null) return;
 						for (int a = 0; a < curioInv.getSlots(); ++a)
 						{
-							int id = LockingItem.getOrSetId(curioInv.getStackInSlot(a));
+							// readId, not getOrSetId: an empty slot would otherwise get a random id written into
+							// ItemStack.EMPTY, whose tag is a shared singleton.
+							OptionalInt slotId = LockingItem.readId(curioInv.getStackInSlot(a));
+							if(slotId.isEmpty())
+								continue;
+							int id = slotId.getAsInt();
 							boolean matched = false;
 							for (Lockable l : intersect)
 							{
@@ -551,7 +574,7 @@ public final class LocksForgeEvents
 									if (!world.isClientSide)
 									{
 										boolean wasLocked = l.lock.isLocked();
-										l.lock.setLocked(!wasLocked);
+										LocksUtil.setLocked(world, l, !wasLocked, player);
 										if (wasLocked)
 											LocksUtil.resolveLootTables(world, l, player);
 									}
@@ -564,18 +587,43 @@ public final class LocksForgeEvents
 							}
 						}
 					}
+					else if(stack.isEmpty() && LocksServerConfig.ALLOW_ITEMLESS_LOCK_PICKING.get())
+					{
+						// Last resort, after every authorization path above: an empty main hand plays the
+						// normal pin minigame with no item when the server allows it. A matching key, held
+						// ring, Curios ring or Awareness lock still wins, so a player who can simply open the
+						// lock is never forced into the minigame just because her hand is empty.
+						//
+						// Only an empty hand qualifies. Treating an arbitrary held item as a virtual pick
+						// would hijack interactions with food, tools, blocks and other mods' items.
+						//
+						// This cannot shadow the sneak + empty-hand lock removal further down: that path is
+						// only reachable when every lockable here is already unlocked, and this branch only
+						// runs while one is locked.
+						if(!world.isClientSide)
+							openPicking(player, lkb, LockPickingMode.ITEMLESS);
+					}
 					else
 					{
 						// No matching item anywhere: rattle (unless Silent enchantment)
 						lkb.swing(20);
 						// Optional theft punishment: shock the player for interacting with a locked block without a key (off by default)
 						ShockingHelper.tryShock(player, lkb.stack, Vec3.atCenterOf(pos), ShockingHelper.Trigger.UNAUTHORIZED_INTERACTION);
+						boolean keyBlank = stack.getItem() == LocksItems.KEY_BLANK.get();
 						if(!LocksServerConfig.ENABLE_SILENT.get() || EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.SILENT.get(), lkb.stack) == 0)
 						{
 							world.playSound(player, pos, LocksSoundEvents.LOCK_RATTLE.get(), SoundSource.BLOCKS, 1f, 1f);
-							if(world.isClientSide && LocksClientConfig.DEAF_MODE.get())
+							if(world.isClientSide && !keyBlank && LocksClientConfig.DEAF_MODE.get())
 								player.displayClientMessage(LOCKED_MESSAGE, true);
 						}
+						// A blank cannot copy a lock that is already placed — that would let any visitor cut a
+						// matching key and defeat the point of the mod. Explain the pre-placement workflow
+						// instead of the generic locked message. Nothing is read from or written to either the
+						// lock or the stack. Instructional rather than an accessibility fallback, so unlike the
+						// deaf-mode hint it always shows; one click fires the event once per side, so there is
+						// nothing to rate-limit.
+						if(world.isClientSide && keyBlank)
+							player.displayClientMessage(KEY_BLANK_PAIRING_MESSAGE, true);
 					}
 				}
 			}
@@ -597,7 +645,7 @@ public final class LocksForgeEvents
 				world.playSound(player, pos, LocksSoundEvents.LOCK_CLOSE.get(), SoundSource.BLOCKS, 1f, 1f);
 				if(!world.isClientSide)
 					for(Lockable l : intersect)
-						l.lock.setLocked(true);
+						LocksUtil.setLocked(world, l, true, player);
 				relocked = true;
 			}
 			else if(LocksTagHelper.isKey(stack))
@@ -614,7 +662,7 @@ public final class LocksForgeEvents
 					if(!world.isClientSide)
 						for(Lockable l : intersect)
 							if(l.lock.id == id)
-								l.lock.setLocked(true);
+								LocksUtil.setLocked(world, l, true, player);
 					relocked = true;
 				}
 			}
@@ -625,7 +673,12 @@ public final class LocksForgeEvents
 				{
 					for(int a = 0; a < inv.getSlots(); ++a)
 					{
-						int id = LockingItem.getOrSetId(inv.getStackInSlot(a));
+						// readId, not getOrSetId: an empty slot would otherwise get a random id written into
+					// ItemStack.EMPTY, whose tag is a shared singleton.
+					OptionalInt slotId = LockingItem.readId(inv.getStackInSlot(a));
+					if(slotId.isEmpty())
+						continue;
+					int id = slotId.getAsInt();
 						boolean matched = false;
 						for(Lockable l : intersect)
 						{
@@ -633,7 +686,7 @@ public final class LocksForgeEvents
 							{
 								matched = true;
 								if(!world.isClientSide)
-									l.lock.setLocked(true);
+									LocksUtil.setLocked(world, l, true, player);
 							}
 						}
 						if(matched)
@@ -665,7 +718,7 @@ public final class LocksForgeEvents
 								java.util.UUID lOwner = LockItem.getOwner(l.stack);
 								if(lOwner != null && lOwner.equals(player.getUUID())
 									&& EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.AWARENESS.get(), l.stack) > 0)
-									l.lock.setLocked(true);
+									LocksUtil.setLocked(world, l, true, player);
 							}
 						relocked = true;
 						break;
@@ -685,7 +738,12 @@ public final class LocksForgeEvents
 						{
 							for(int a = 0; a < curioInv.getSlots(); ++a)
 							{
-								int id = LockingItem.getOrSetId(curioInv.getStackInSlot(a));
+								// readId, not getOrSetId: an empty slot would otherwise get a random id written into
+							// ItemStack.EMPTY, whose tag is a shared singleton.
+							OptionalInt slotId = LockingItem.readId(curioInv.getStackInSlot(a));
+							if(slotId.isEmpty())
+								continue;
+							int id = slotId.getAsInt();
 								boolean matched = false;
 								for(Lockable l : intersect)
 								{
@@ -693,7 +751,7 @@ public final class LocksForgeEvents
 									{
 										matched = true;
 										if(!world.isClientSide)
-											l.lock.setLocked(true);
+											LocksUtil.setLocked(world, l, true, player);
 									}
 								}
 								if(matched)

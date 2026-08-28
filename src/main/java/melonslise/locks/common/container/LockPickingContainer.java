@@ -18,6 +18,7 @@ import melonslise.locks.common.network.toclient.TryPinResultPacket;
 import melonslise.locks.common.util.Lockable;
 import melonslise.locks.common.util.LocksUtil;
 import melonslise.locks.common.util.ShockingHelper;
+import melonslise.locks.common.container.LockPickingPolicy.PinOutcome;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
@@ -60,6 +61,7 @@ public class LockPickingContainer extends AbstractContainerMenu
 
 	public final Player player;
 	public final InteractionHand hand;
+	public final LockPickingMode mode;
 	public final Lockable lockable;
 
 	public final Vec3 pos;
@@ -68,11 +70,12 @@ public class LockPickingContainer extends AbstractContainerMenu
 
 	protected int currIndex = 0;
 
-	public LockPickingContainer(int id, Player player, InteractionHand hand, Lockable lkb)
+	public LockPickingContainer(int id, Player player, InteractionHand hand, LockPickingMode mode, Lockable lkb)
 	{
 		super(LocksMenuTypes.LOCK_PICKING.get(), id);
 		this.player = player;
 		this.hand = hand;
+		this.mode = mode;
 		this.lockable = lkb;
 
 		Lockable.State state = lkb.getLockState(player.level());
@@ -97,10 +100,27 @@ public class LockPickingContainer extends AbstractContainerMenu
 		return LocksTagHelper.isLockPick(stack) && LockPickItem.canPick(stack, this.complexity);
 	}
 
+	// The single gate for "may this player still act on this session", shared by stillValid (polled every
+	// tick) and TryPinPacket, so a pin can never be accepted under conditions that would have closed the menu.
+	//
+	// Only ITEM_BACKED ever touches pick code: an itemless hand is empty, and the LockPickItem stat helpers
+	// write NBT on read, so they must never see air.
+	public boolean canAttempt(Player player)
+	{
+		return LockPickingPolicy.isSessionValid(
+			this.mode,
+			this.lockable.lock.isLocked(),
+			player.isSpectator(),
+			player.distanceToSqr(this.pos),
+			this.mode == LockPickingMode.ITEM_BACKED && this.isValidPick(player.getItemInHand(this.hand)),
+			player.getItemInHand(this.hand).isEmpty(),
+			LocksServerConfig.ALLOW_ITEMLESS_LOCK_PICKING.get());
+	}
+
 	@Override
 	public boolean stillValid(Player player)
 	{
-		return this.lockable.lock.isLocked() && this.isValidPick(player.getItemInHand(this.hand));
+		return this.canAttempt(player);
 	}
 
 	public boolean isOpen()
@@ -118,26 +138,31 @@ public class LockPickingContainer extends AbstractContainerMenu
 	{
 		if(this.isOpen())
 			return;
-		boolean correct = false;
-		boolean reset = false;
-		if(this.lockable.lock.checkPin(this.currIndex, currPin))
-		{
+		boolean correct = this.lockable.lock.checkPin(this.currIndex, currPin);
+		// && short-circuits, so an itemless attempt never enters tryBreakPick at all: no durability, no
+		// break event, no replacement-pick scan, and no stat helper ever sees an empty stack.
+		boolean pickBroke = LockPickingPolicy.shouldRollPickBreak(this.mode, correct) && this.tryBreakPick(player, currPin);
+		PinOutcome outcome = LockPickingPolicy.resolve(this.mode, correct, pickBroke);
+
+		if(correct)
 			++this.currIndex;
-			correct = true;
+		if(LockPickingPolicy.resetsProgress(outcome))
+			this.reset();
+
+		if(correct)
 			this.player.level().playSound(null, this.pos.x, this.pos.y, this.pos.z, LocksSoundEvents.PIN_MATCH.get(), SoundSource.BLOCKS, 1f, 1f);
-		}
 		else
 		{
-			if(this.tryBreakPick(player, currPin))
-			{
-				reset = true;
-				this.reset();
+			if(LockPickingPolicy.triggersPickBreakShock(outcome))
 				ShockingHelper.tryShock(this.player, this.lockable.stack, this.player.position(), ShockingHelper.Trigger.PICK_BREAK);
-			}
-			else
-			{
-				// Wrong pin without a broken pick — opt-in punishment, off by default (mutually exclusive with PICK_BREAK above)
+			// Opt-in punishment, off by default. Mutually exclusive with PICK_BREAK above; an itemless miss
+			// reaches this one instead, since nothing broke.
+			else if(LockPickingPolicy.triggersWrongPinShock(outcome))
 				ShockingHelper.tryShock(this.player, this.lockable.stack, this.pos, ShockingHelper.Trigger.WRONG_PIN);
+			if(outcome != PinOutcome.PICK_BROKE)
+			{
+				// No Quiet Hand special case for itemless: the hand is empty, so the enchantment level is 0
+				// and this already yields full volume.
 				ItemStack pickStack = this.player.getItemInHand(this.hand);
 				float failVolume = LocksServerConfig.ENABLE_QUIET_HAND.get()
 					&& EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.QUIET_HAND.get(), pickStack) > 0
@@ -145,7 +170,8 @@ public class LockPickingContainer extends AbstractContainerMenu
 				this.player.level().playSound(null, this.pos.x, this.pos.y, this.pos.z, LocksSoundEvents.PIN_FAIL.get(), SoundSource.BLOCKS, failVolume, 1f);
 			}
 		}
-		LocksNetwork.MAIN.send(PacketDistributor.PLAYER.with(() -> (ServerPlayer) this.player), new TryPinResultPacket(correct, reset));
+		// The client picks its animation from the menu mode, so the packet stays two plain booleans.
+		LocksNetwork.MAIN.send(PacketDistributor.PLAYER.with(() -> (ServerPlayer) this.player), new TryPinResultPacket(correct, LockPickingPolicy.resetsProgress(outcome)));
 	}
 
 	@OnlyIn(Dist.CLIENT)
@@ -223,16 +249,26 @@ public class LockPickingContainer extends AbstractContainerMenu
 	public void removed(Player player)
 	{
 		super.removed(player);
+		// Server-only: completion is judged against the server currIndex, so a client cannot forge it.
+		if(player.level().isClientSide)
+			return;
 		if(!this.isOpen() || !this.lockable.lock.isLocked())
 			return;
-		this.lockable.lock.setLocked(!this.lockable.lock.isLocked());
-		this.player.level().playSound(player, this.pos.x, this.pos.y, this.pos.z, LocksSoundEvents.LOCK_OPEN.get(), SoundSource.BLOCKS, 1f, 1f);
+		// Explicit target, never a toggle — a finished pick must never re-lock because state moved underneath it.
+		// Deliberately not re-checking canAttempt here: the pins are already solved, and an item landing in the
+		// hand on the closing tick should not swallow the result.
+		LocksUtil.setLocked(player.level(), this.lockable, false, player);
+		// null, not player: this now runs on the server, where passing the player would EXCLUDE them from the sound.
+		this.player.level().playSound(null, this.pos.x, this.pos.y, this.pos.z, LocksSoundEvents.LOCK_OPEN.get(), SoundSource.BLOCKS, 1f, 1f);
 		LocksUtil.resolveLootTables(this.player.level(), this.lockable, this.player);
 	}
 
 	public static final IContainerFactory<LockPickingContainer> FACTORY = (id, inv, buf) ->
 	{
 		InteractionHand hand = buf.readEnum(InteractionHand.class);
+		// Bounded byte rather than readEnum: readEnum indexes the values array unchecked and would throw on a
+		// malformed id. An unknown mode falls back to the restrictive one.
+		LockPickingMode mode = LockPickingMode.byId(buf.readByte());
 		Lockable received = Lockable.fromBuf(buf);
 		// Prefer the client's already-loaded instance (keeps the picked lock and the rendered lock the same
 		// object), but fall back to the reconstructed one if the client hasn't loaded it yet — so the minigame
@@ -245,17 +281,19 @@ public class LockPickingContainer extends AbstractContainerMenu
 			if(existing != handler.getLoaded().defaultReturnValue())
 				lkb = existing;
 		}
-		return new LockPickingContainer(id, inv.player, hand, lkb);
+		return new LockPickingContainer(id, inv.player, hand, mode, lkb);
 	};
 
 	public static class Writer implements Consumer<FriendlyByteBuf>
 	{
 		public final InteractionHand hand;
+		public final LockPickingMode mode;
 		public final Lockable lockable;
 
-		public Writer(InteractionHand hand, Lockable lkb)
+		public Writer(InteractionHand hand, LockPickingMode mode, Lockable lkb)
 		{
 			this.hand = hand;
+			this.mode = mode;
 			this.lockable = lkb;
 		}
 
@@ -263,6 +301,8 @@ public class LockPickingContainer extends AbstractContainerMenu
 		public void accept(FriendlyByteBuf buf)
 		{
 			buf.writeEnum(this.hand);
+			// Mode goes before the lockable so the variable-length tail stays last.
+			buf.writeByte(this.mode.ordinal());
 			// Write the FULL lockable, not just its id. The client opens this screen from a vanilla menu packet
 			// that can race ahead of our lock-sync packets, so resolving by id against the client's loaded map
 			// could miss and dead-end the minigame ("Lockable not found"). Sending the lockable lets the client
@@ -274,18 +314,20 @@ public class LockPickingContainer extends AbstractContainerMenu
 	public static class Provider implements MenuProvider
 	{
 		public final InteractionHand hand;
+		public final LockPickingMode mode;
 		public final Lockable lockable;
 
-		public Provider(InteractionHand hand, Lockable lkb)
+		public Provider(InteractionHand hand, LockPickingMode mode, Lockable lkb)
 		{
 			this.hand = hand;
+			this.mode = mode;
 			this.lockable = lkb;
 		}
 
 		@Override
 		public AbstractContainerMenu createMenu(int id, Inventory inv, Player player)
 		{
-			return new LockPickingContainer(id, player, this.hand, this.lockable);
+			return new LockPickingContainer(id, player, this.hand, this.mode, this.lockable);
 		}
 
 		@Override

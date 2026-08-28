@@ -1,5 +1,37 @@
 # Locks Reforged Changelog
 
+## 1.7.2
+
+### Locked doors now stop villagers and other door-opening AI
+- **Fixed villagers walking straight through a locked door.** Lock enforcement ran on the player interaction event and on redstone, but mob AI does not simulate a right-click — it drives the door through Minecraft's own entity-facing door API, which nothing guarded. Locks now guard that method directly, so vanilla villagers, other door-opening mobs, raiders, and modded AI that operates a vanilla or subclassed `DoorBlock` are all covered by the same "is this locked" check every other protection already used.
+  - Closing a locked door is still allowed — only opening is refused. Nothing is done beyond refusing: no sound, no game event, no interference with pathing or AI memory, because AI retries constantly and any feedback there would be spam.
+  - **Re-locking an open door now closes it**, so a door can no longer stand physically open while its lock reports locked. Placing a lock on an already-open door closes it too. Every unlock and re-lock path — matching key, key ring, Curios ring, Master Key, Awareness owner, Auto-Pick, and a completed minigame — now runs through one helper that owns this rule.
+  - *Boundary:* this covers doors that go through the vanilla door API. A modded "door" that does not extend `DoorBlock`, or that writes its open state directly, needs its own compatibility hook. Trapdoors and fence gates were checked and need nothing: neither has an entity-facing open method in 1.20.1, so their only openers are players and redstone, both already covered. Zombies *breaking* a door is a separate, pre-existing gap — break protection hangs off a player-only event.
+
+### Optional itemless lock picking
+- Added the server option **Allow Itemless Lock Picking** (default: **off**). When enabled, right-clicking a locked block with an empty main hand plays the normal pin minigame with no lock pick at all.
+- Itemless attempts never consume, damage, move or create an item, never roll Auto-Pick, and are never blocked by Complexity — so loot can never end up permanently gated behind a pick you do not have. A wrong pin instead drops every solved pin, keeping a real failure cost. The pick-break shock never fires (nothing broke); the opt-in wrong-pin shock still can.
+- Only a genuinely empty main hand qualifies. An arbitrary held item is never treated as a virtual pick, and a matching key, key ring, Curios ring or Awareness ownership still takes precedence — an empty hand never forces you into the minigame when you could simply open the lock.
+- **Physical lock picks are unchanged**: tiers, strength, durability, breakage, replacement-pick selection, Auto-Pick probability, and Finesse, Attunement, Grounded, Quiet Hand, Last Catch and Sturdy all behave exactly as in 1.7.1.
+- The server decides the mode when the screen opens and tells the client only so it can draw the right tool; the client can never claim a session is itemless. Every pin the client sends is re-validated server-side against lock state, mode, config, reach and hand contents.
+- **Multiplayer note:** the network protocol moved from `2` to `3` because the lock-picking screen's payload changed. A 1.7.1 client cannot join a 1.7.2 server, or the reverse — the connection is refused cleanly at the handshake rather than misbehaving later. Update both sides together.
+
+### Clearer and easier key pairing
+- **Fixed a lock crafted or taken straight from the creative menu into a crafting grid refusing to pair.** Locks and keys are assigned their ID during an inventory tick, so one that never sat in a player's inventory had none yet — and the recipe required an ID to already be there. Locks and keys are now stamped the moment they are crafted, and the recipe assigns one server-side if it is still missing, so pairing works on the first try.
+- **The recipe no longer accepts just any item carrying an `Id` NBT field.** It now recognises the source by item type and by the `locks:locks` / `locks:keys` tags, and explicitly rejects the Master Key, the Key Ring, and lock picks. An unrelated mod's item that happens to use a tag named `Id` can no longer cut a key.
+- Added **Key Blank tooltips** and an in-world hint: right-clicking a placed lock with a blank now explains the pre-placement workflow instead of the generic "this block is locked" message. It reads nothing from the lock and changes nothing.
+- Added full pairing instructions to the README and the mod description. Keys are paired from an **unplaced** lock; a blank key still cannot copy a lock that is already placed — that restriction is the point of the mod, not an oversight.
+- Note for anyone who read the old notes: pairing in the 2×2 inventory grid already worked in 1.7.1. The recipe's grid-size rule was dead code that nothing consulted, and it has been corrected to say what it means, but that was never the failure people were hitting.
+
+### Hardening
+- **Lock-picking sessions now end when you walk away.** The screen previously stayed usable from any distance, through walls; it now closes beyond normal container reach (8 blocks) and in spectator mode. This applies to physical picking as well as itemless — an intentional change to 1.7.1 behavior, and the only one in this release.
+- Fixed a lock-picking packet arriving with no Locks screen open throwing an `UnsupportedOperationException` on the server. Menu identity is now checked with `instanceof` rather than by asking for a menu type that a plain inventory does not have.
+- Fixed scanning a key ring writing a random lock ID into `ItemStack.EMPTY`'s shared tag, which leaked NBT visible to other mods.
+
+### Build
+- Deleted two dead files from the project root: a byte-identical copy of `locks.mixins.json` that the build never packaged, and a stray `curios.mixins.json` belonging to Curios itself for classes this project does not contain. The project root is not a resource root, so neither was ever read — keeping them synchronized only invited drift. `src/main/resources/locks.mixins.json` is the only manifest that ships.
+- Added 28 pure-logic unit tests covering picking-mode selection, session validity, pin outcomes, the mode wire codec, the key-pairing slot rules, and lock-state idempotence. `./gradlew test` now runs 53.
+
 ## 1.7.1
 
 ### Native steel fallback — self-sufficient steel that defers to a modpack's own steel economy

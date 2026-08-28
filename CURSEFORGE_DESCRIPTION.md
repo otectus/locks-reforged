@@ -37,8 +37,23 @@ Pick locks with an interactive pin-matching minigame. Match each pin to crack th
 
 **Lock Picks:** Wood, Bobby Pin (copper), Iron, Steel, Gold, Diamond, Netherite (+ custom)
 
+*Optional (new in 1.7.2):* turn on **Allow Itemless Lock Picking** and players can play the same minigame with an empty hand, no lock pick required. Itemless attempts never consume anything and are never blocked by Complexity, but a wrong pin drops every solved pin. Off by default; physical picks work exactly as before either way.
+
 ### Keys & Key Rings
-Craft **keys** that match your locks, or use a **Key Ring** to carry multiple keys. A **Master Key** opens any lock.
+
+A Key Blank is uncut — it opens nothing until you pair it with a lock, and **you pair it before placing the lock**:
+
+1. Craft a **Key Blank**.
+2. Before placing the lock, put one Key Blank and the lock together in any crafting grid — your 2×2 inventory grid works, and so does a crafting table.
+3. The recipe gives back the lock and produces a **Key** matching it.
+4. Place the lock. That Key now unlocks and re-locks it.
+5. Craft the paired Key with another Key Blank to make a spare.
+
+The recipe is shapeless, and one blank makes one key.
+
+**A blank key cannot copy a lock that is already placed** — otherwise any visitor could cut themselves a matching key and your lock would protect nothing. Right-clicking a placed lock with a blank just reminds you of the workflow. If you placed a lock before pairing it, sneak with an empty hand to take the unlocked lock back, pair it, and place it again.
+
+Carry a **Key Ring** to hold many keys at once — it opens any lock whose key is inside, and with Curios installed it works straight from a curio slot. A **Master Key** opens everything.
 
 ### Enchantments
 
@@ -61,7 +76,9 @@ Craft **keys** that match your locks, or use a **Key Ring** to carry multiple ke
 Lock picks are now enchantable at the enchanting table. Each enchantment can be individually enabled — and the lock pick enchantments' effects tuned — in the server config.
 
 ### Full Protection
-Locked blocks are protected from:
+Locked doors cannot be opened by villagers or any other door-opening AI — including modded NPCs that use the vanilla door API.
+
+Locked blocks are also protected from:
 - Redstone activation
 - Hopper extraction
 - Piston movement
@@ -204,6 +221,7 @@ All settings are customizable via config files. Note that `locks-server.toml` is
 - **Hide Lock ID / Hide HUD Enchantments** — Tooltip display options
 - **Enchantment Toggles** — Individually enable or disable each of the 12 enchantments (7 lock-side + 5 lock-pick-side), and tune the lock pick enchantments' effects
 - **Netherite Lockpick Unbreakable** — When enabled, netherite lock picks never break (default: false)
+- **Allow Itemless Lock Picking** — Let an empty main hand play the lock picking minigame with no lock pick (default: false)
 
 **`config/locks-client.toml`** — Client-side settings
 - **Deaf Mode** — Visual feedback for lock picking accessibility (default: true)

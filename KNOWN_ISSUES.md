@@ -4,6 +4,117 @@
 
 1. **Refmap warning in dev**: The mixin refmap (`locks.refmap.json`) shows "could not be read" in the dev environment. This is a known MixinGradle/ForgeGradle cosmetic issue — dev uses official (Mojang) names which match source annotations directly, so no remapping is needed. The refmap IS correctly included in the production JAR. No fix required.
 
+## Villager-Proof Doors (new in 1.7.2)
+
+Locked doors are now guarded at `DoorBlock#setOpen`, the method every non-player door opener funnels through — the villager Brain behavior, the legacy `DoorInteractGoal`, raider goals, and modded AI driving a vanilla or subclassed `DoorBlock`.
+
+**How it works:** `mixin/DoorBlockMixin` injects at HEAD, cancels when `open == true` and `LocksUtil.locked(world, pos)` reports locked, and does nothing else — no sound, no game event, no AI-memory or navigation mutation, because AI retries constantly. It runs server-side only: on the client `LocksUtil.locked` reads the lockable mirror, which can legitimately be stale, and `setOpen` has no vanilla client callers anyway. It reuses the existing non-forcing chunk lookup, so it adds no `getChunk`/`getChunkAt` call.
+
+**Why not the player path:** `DoorBlock#use` does its own `state.cycle(OPEN)` and never calls `setOpen`, so the mixin and the existing `LocksForgeEvents#onRightClick` denial cannot overlap or double-fire.
+
+**The closed-door invariant:** blocking future opens is not enough if the door was already open. `LocksUtil.setLocked` closes any open door inside the lockable's box before flipping the lock, and every transition — held key, key ring, Curios ring, Master Key, Awareness, Auto-Pick, completed minigame — routes through it. `LocksUtil.closeDoors` runs on *every* lock-to-locked request rather than only on a state change, because `Lock#setLocked` is idempotent and would otherwise skip a door under an already-locked lock. It guards each position with `hasChunkAt` first, since `Level#getBlockState` force-loads.
+
+**Scope, verified not guessed:** `TrapDoorBlock` and `FenceGateBlock` have no entity-facing open method in 1.20.1 — their only writers of OPEN are `use` (players, already covered) and `neighborChanged` (redstone, already covered by `LevelMixin`). There is no AI bypass for them and no mixin was added; a speculative one would be dead code plus an injection-failure risk under `defaultRequire: 1`.
+
+**Known gap (pre-existing, not fixed in 1.7.2):** mobs that *break* doors, such as zombies via `BreakDoorGoal`, are not stopped by `Protect Lockables` — that protection hangs off `BlockEvent.BreakEvent`, a player-only event. "Villager-proof" should not be read as "zombie-proof".
+
+**Verified:** `./gradlew test` (53 tests pass), `clean build` / `runData` clean, and the mixin annotation processor resolves `setOpen` to `m_153165_` in the refmap. Dev **client boots to the title screen** and a **dedicated server reaches `Done`**, both with no mixin apply error — under `injectors.defaultRequire: 1` a mis-targeted `DoorBlockMixin` would abort loading, so this is what proves the guard is live. In-game door *behavior* is in the manual matrix below and **has not been run yet**.
+
+## Optional Itemless Lock Picking (new in 1.7.2)
+
+Server option **Allow Itemless Lock Picking**, default `false`. When on, an empty main hand opens the normal pin minigame with no lock pick.
+
+**How it works:** the server decides a `LockPickingMode` (`ITEM_BACKED` / `ITEMLESS`) once, at menu-open time, and writes it into the menu's extra data as a bounded byte purely so the client can draw the right tool and pick the right failure animation. It is never re-derived from the held stack on either side, so swapping a pick for air mid-session cannot flip modes. Decoding clamps an unknown value to `ITEM_BACKED`, the restrictive mode, rather than indexing the enum unchecked.
+
+**Where the rules live:** `common/container/LockPickingPolicy` — plain booleans, no game state, unit-tested. `LockPickingContainer#canAttempt` and the interaction handler gather world state and delegate. `stillValid` and `TryPinPacket` share that one gate, so a pin can never be accepted under conditions that would have closed the screen.
+
+**Itemless semantics:** never rolls the break chance (so no durability loss, no break event, no replacement-pick scan, and no stat helper ever sees an empty stack), never rolls Auto-Pick, ignores Complexity and every pick-side enchantment, and resets all solved pins on a wrong pin. Quiet Hand needs no special case — an empty hand yields enchantment level 0, which already means full volume. Shocking `PICK_BREAK` cannot fire; the opt-in `WRONG_PIN` trigger still can.
+
+**Interaction precedence:** physical pick, then Master Key, matching held key, held key ring, Awareness owner, Curios key ring, then itemless, then the normal denial. A player who can simply open the lock is never pushed into the minigame. There is no clash with the sneak + empty-hand lock removal gesture: that path is only reachable when every lockable at the position is already unlocked, and itemless only runs while one is locked.
+
+**Protocol:** `LocksNetwork.PROTOCOL_VERSION` moved `2` → `3`. Both acceptors are exact-match, so a mixed 1.7.1/1.7.2 connection is refused at the channel handshake before any menu bytes are decoded.
+
+**Reach check (intentional deviation):** session validity now also requires normal container reach (`distanceToSqr <= 64`) and a non-spectator player, **for physical picking too**. 1.7.1 let a player keep the minigame open from any distance through a wall. This is the only intentional change to physical-pick behavior in the release.
+
+**Verified:** 16 pure-logic tests over mode selection, session validity, pin outcomes and the wire codec. A dedicated-server boot generates `world/serverconfig/locks-server.toml` containing `"Allow Itemless Lock Picking" = false` with its full comment block, and loads no client-only class. All in-game *behavior* is manual and **has not been run yet**.
+
+## Key Pairing (new in 1.7.2)
+
+**Root cause of the reported failure:** locks and keys get their `Id` during a server-side inventory tick, and the recipe required that tag to already be present. A lock that went creative menu → cursor → crafting grid never ticked in an inventory, so it had no `Id` and the recipe silently refused it. `LockingItem#onCraftedBy` now stamps the id at craft time, `inventoryTick` remains the backstop for `/give`, loot and third-party paths, and `KeyRecipe#assemble` assigns one server-side if it is still missing.
+
+**Correction to the 1.7.2 spec:** the spec attributed the failure to `canCraftInDimensions` returning `x >= 3 && y >= 3`, blocking the 2×2 grid. That is wrong. `CustomRecipe#isSpecial()` returns `true`, so `locks:crafting_key` never enters the recipe book, and `RecipeManager#getRecipeFor` filters purely on `matches(...)` — nothing in vanilla consults `canCraftInDimensions` for this recipe. **Pairing in the 2×2 grid already worked in 1.7.1.** The bound was corrected to `x * y >= 2` for honesty, but it changes no behavior and must not be advertised as a fix.
+
+**Source validation:** `common/recipe/KeyPairing` classifies each slot as EMPTY / BLANK / SOURCE / INVALID. Exclusions (Master Key, Key Ring, lock picks) are checked *before* the tag lookup, so a datapack adding the master key to `locks:keys` cannot turn it into a pairing source. The pure `isValidLayout` rule — exactly one source, exactly one blank, nothing else — is unit-tested.
+
+**Security model unchanged:** you pair from an unplaced lock item or an existing paired key. A blank still cannot copy a placed lock; right-clicking one with a blank shows an instructional message and mutates nothing. The Key Blank tooltip never reveals an ID and stays correct with `Hide Lock ID` enabled.
+
+**Implementation note:** `KeyBlankItem` extends `Item`, deliberately **not** `LockingItem`. `LockingItem` forces `stacksTo(1)` and stamps an `Id` every inventory tick — either would break blanks, and the stack-size change would silently truncate the stacks of blanks in existing worlds.
+
+**Verified:** 9 pure-logic layout tests. All in-game crafting behavior is manual and **has not been run yet**.
+
+## 1.7.2 Manual QA Script (NOT YET RUN)
+
+None of the following has been executed. Run before release and tick individually.
+
+**Doors**
+- [ ] Villager cannot open a locked oak door; place a villager, a POI and a locked door between them and let it run — the door never reaches `OPEN=true`, no sound spam, tick time stable
+- [ ] The same villager opens the door once the lock is unlocked
+- [ ] A villager may still *close* a locked open door
+- [ ] Re-locking an open door closes it; placing a lock on an open door closes it
+- [ ] Double doors and locks spanning both halves are protected on every leaf
+- [ ] Redstone still cannot open a locked door, and works again after unlock
+- [ ] An ordinary unprotected door behaves exactly as vanilla
+- [ ] A modded `DoorBlock` subclass using `setOpen` is protected
+- [ ] Trapdoors and fence gates behave as vanilla (no regression from the door work)
+
+**Itemless picking**
+- [x] Generated server config contains `Allow Itemless Lock Picking = false` (verified on a fresh dedicated-server boot)
+- [ ] An existing 1.7.1 world whose config lacks the key keeps physical-pick-only behavior
+- [ ] Empty main hand opens the minigame only when enabled; an arbitrary held item never does
+- [ ] A matching Curios ring, key ring, held key, Master Key and Awareness ownership all still take precedence over itemless
+- [ ] No item is consumed, damaged, created or moved by an itemless attempt
+- [ ] Maximum Complexity cannot block itemless access
+- [ ] A wrong itemless pin resets progress with the **intact** tool animation, not the split-pick break
+- [ ] Completion unlocks once and resolves loot once, **and the unlock sound is audible to the picker** (`removed()` became server-only; the sound must be broadcast with a null player or the picker is excluded)
+- [ ] Closing the screen early leaves the lock locked
+- [ ] Itemless failure never fires Shocking `PICK_BREAK`; it does fire `WRONG_PIN` when that trigger is enabled
+- [ ] Walking out of reach, changing dimension, going spectator, filling the recorded hand, removing the lock, or toggling the config mid-session all invalidate the session
+- [ ] A dedicated server rejects malformed or stale pin packets without crashing or mutating state
+- [ ] A 1.7.1 client is refused by a 1.7.2 server with a clear protocol message, and vice versa
+
+**Physical-pick regression**
+- [ ] Every built-in and data-driven pick opens its normal GUI texture
+- [ ] Complexity and Attunement thresholds unchanged; Sturdy, Finesse and Last Catch break maths unchanged
+- [ ] Quiet Hand and Grounded unchanged; Auto-Pick stays physical-only at its old probability
+- [ ] Broken-pick replacement still selects a valid inventory pick
+- [ ] Netherite durability and the unbreakable config still correct
+- [ ] Lock-picking GUI still renders correctly with ImmediatelyFast
+
+**Key pairing**
+- [ ] Lock + Key Blank pairs in the 2×2 inventory grid and in a crafting table
+- [ ] The source lock returns unchanged with all NBT and enchantments; the key ID matches
+- [ ] A paired key + blank duplicates correctly and preserves the source key
+- [ ] Exactly one blank is consumed per output, including shift-crafting a stack
+- [ ] Two blanks, two sources, and any extra unrelated item are all rejected
+- [ ] An unrelated mod item carrying an `Id` NBT field is rejected; Master Key, Key Ring and lock picks cannot act as the source
+- [ ] A lock dragged straight from the creative menu into the grid pairs on the first try, and source and output end with the same server ID
+- [ ] `Hide Lock ID = true` hides the numeric ID but keeps the Key Blank instructions
+- [ ] Right-clicking a placed lock with a blank shows the pairing hint and alters neither the stack nor the lock
+
+**Persistence and compatibility**
+- [ ] Locks and keys created in 1.7.1 still match in 1.7.2
+- [ ] Lock state persists across chunk unload, restart, and adjacent-chunk load order
+- [ ] C2ME smoke test: no hang, no off-thread mutation, no new blocking chunk fetch in door or picking validation
+- [ ] Carry On retains lock state and door protection after a move
+- [ ] Hopper, furnace, chest capability, piston, explosion and break protections unchanged
+- [ ] Clean boot with Curios absent, and a clean build and boot with the Carry On jar absent
+
+**JAR inspection** — all verified on the 1.7.2 build
+- [x] Filename and embedded `mods.toml` both report 1.7.2
+- [x] `locks.refmap.json` present; packaged `locks.mixins.json` lists `DoorBlockMixin` (15 common + 1 client)
+- [x] All new translation keys present; `data/locks/recipes/key.json` still points at `locks:crafting_key`
+- [x] No client-only class loaded by the dedicated server (server log clean of `NoClassDefFoundError` / `net.minecraft.client`; the only client references in common code remain the pre-existing ones inside `@OnlyIn(Dist.CLIENT)` methods)
+
 ## Native Steel Fallback (new in 1.7.1)
 
 Locks ships its own steel material (`steel_ingot`, `steel_nugget`, `steel_ore`, `deepslate_steel_ore`) and merges it into the standard `forge:ingots/steel` / `forge:nuggets/steel` / `forge:ores/steel` tags, but **prefers a modpack's own steel** when one exists.
@@ -102,7 +213,7 @@ Manual QA (needs a world with Locks + Carry On; not runnable in the headless bui
 ## Testing Status
 
 ### Verified
-- [x] All 15 mixins apply successfully at runtime (no MixinApplyError)
+- [x] All 16 mixins apply successfully at runtime on both client and dedicated server (no MixinApplyError) — re-verified for 1.7.2
 - [x] Mod loads to title screen without errors
 - [x] Config files created with correct defaults
 - [x] Creative tab registered

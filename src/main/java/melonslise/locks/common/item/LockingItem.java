@@ -1,6 +1,7 @@
 package melonslise.locks.common.item;
 
 import java.util.List;
+import java.util.OptionalInt;
 import java.util.concurrent.ThreadLocalRandom;
 
 import javax.annotation.Nullable;
@@ -39,6 +40,31 @@ public class LockingItem extends Item
 		if(!nbt.contains(KEY_ID))
 			nbt.putInt(KEY_ID, ThreadLocalRandom.current().nextInt());
 		return nbt.getInt(KEY_ID);
+	}
+
+	public static boolean hasId(ItemStack stack)
+	{
+		CompoundTag nbt = stack.getTag();
+		return nbt != null && nbt.contains(KEY_ID);
+	}
+
+	// Read-only counterpart to getOrSetId, which writes a random id into whatever stack it is handed —
+	// including ItemStack.EMPTY, whose tag is a shared singleton. Use this anywhere the stack might be
+	// empty or might legitimately have no id yet.
+	public static OptionalInt readId(ItemStack stack)
+	{
+		return hasId(stack) ? OptionalInt.of(stack.getTag().getInt(KEY_ID)) : OptionalInt.empty();
+	}
+
+	// Locks and keys get their id the moment they are crafted, so a lock taken straight from a crafting
+	// result into a crafting grid already carries one. inventoryTick below remains the backstop for
+	// /give, loot, worldgen and third-party creation paths that never pass through crafting.
+	@Override
+	public void onCraftedBy(ItemStack stack, Level world, net.minecraft.world.entity.player.Player player)
+	{
+		super.onCraftedBy(stack, world, player);
+		if(!world.isClientSide)
+			getOrSetId(stack);
 	}
 
 	@Override

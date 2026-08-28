@@ -6,12 +6,16 @@ import java.util.stream.Stream;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.minecraft.util.RandomSource;
 
+import javax.annotation.Nullable;
+
 import melonslise.locks.common.config.LocksConfig;
 import melonslise.locks.common.init.LocksCapabilities;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -115,6 +119,50 @@ public final class LocksUtil
 	public static boolean locked(Level world, BlockPos pos)
 	{
 		return intersecting(world, pos).anyMatch(LocksPredicates.LOCKED);
+	}
+
+	// Physically closes every open door inside bb. Server-side only.
+	//
+	// Kept separate from setLocked, and called on EVERY lock-to-locked request rather than only on a
+	// state transition, because Lock#setLocked is idempotent: a lock that already reports locked fires
+	// no observer, so a door left open underneath it would never close. That idempotence is load-bearing
+	// elsewhere (the re-lock branches call setLocked in loops and each redundant call would otherwise
+	// dirty chunks and send a packet), so the invariant is enforced here instead.
+	//
+	// Never force-loads: Level#getBlockState resolves through getChunk(..., true), so each position is
+	// gated on the non-blocking hasChunkAt first — same discipline as Lockable#getLockState.
+	//
+	// Goes through DoorBlock#setOpen rather than writing OPEN directly so vanilla's two-half sync, sound
+	// and game event still happen. DoorBlockMixin only refuses open == true, so this is allowed. Closing
+	// one half updates the other via updateShape, after which the loop sees it closed and no-ops, so the
+	// sound plays once. Changing only the OPEN property keeps the same Block, so ServerLevelMixin's
+	// sendBlockUpdated hook early-returns and the lock is not popped.
+	public static void closeDoors(Level world, Cuboid6i bb, @Nullable Entity source)
+	{
+		if(world.isClientSide)
+			return;
+		for(BlockPos pos : bb.getContainedPos())
+		{
+			if(!world.hasChunkAt(pos))
+				continue;
+			BlockState state = world.getBlockState(pos);
+			if(!(state.getBlock() instanceof DoorBlock door) || !state.getValue(DoorBlock.OPEN))
+				continue;
+			door.setOpen(source, world, state, pos.immutable(), false);
+		}
+	}
+
+	// The one place a lockable's lock state changes. Enforces "locked implies physically closed" so a
+	// door can never stay open under a lock that reports locked. Every unlock/re-lock path routes here.
+	//
+	// Closes before flipping the lock so no client ever observes locked + open, not even for a tick.
+	// Deliberately does not play a sound (each caller owns its own) or resolve loot tables (that stays
+	// tied to a real locked-to-unlocked transition at the call sites that own it).
+	public static void setLocked(Level world, Lockable lockable, boolean locked, @Nullable Entity source)
+	{
+		if(locked)
+			closeDoors(world, lockable.bb, source);
+		lockable.lock.setLocked(locked);
 	}
 
 	public static void resolveLootTables(Level level, Lockable lockable, Player player)

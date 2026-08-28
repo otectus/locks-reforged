@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -102,6 +103,37 @@ public class Cuboid6iTest
 		// Returning null for the second chunk with endEarly=true aborts and returns null overall.
 		List<String> result = box.containedChunksTo((x, z) -> x == 1 ? null : "ok", true);
 		org.junit.jupiter.api.Assertions.assertNull(result);
+	}
+
+	@Test
+	void containedPosCoversBothHalvesOfASingleDoor()
+	{
+		// LockItem.easyLock spans a door's two halves, and LocksUtil.closeDoors walks exactly these
+		// positions looking for an open door to shut. Missing one would leave half a door open under a
+		// lock reporting locked.
+		Cuboid6i box = new Cuboid6i(new BlockPos(4, 64, 9), new BlockPos(4, 65, 9));
+		assertEquals(List.of(new BlockPos(4, 64, 9), new BlockPos(4, 65, 9)), collectPos(box));
+	}
+
+	@Test
+	void containedPosCoversAllFourBlocksOfADoubleDoor()
+	{
+		// easyLock jumps sideways to the paired leaf when a door has a hinge partner, so the box is 2x2x1
+		// and every leaf must be protected and closable.
+		Cuboid6i box = new Cuboid6i(new BlockPos(4, 64, 9), new BlockPos(5, 65, 9));
+		assertEquals(4, collectPos(box).size());
+		assertTrue(collectPos(box).containsAll(List.of(
+			new BlockPos(4, 64, 9), new BlockPos(4, 65, 9),
+			new BlockPos(5, 64, 9), new BlockPos(5, 65, 9))));
+	}
+
+	// Helper: BlockPos.betweenClosed reuses one mutable cursor, so positions must be copied to be kept.
+	private static List<BlockPos> collectPos(Cuboid6i box)
+	{
+		List<BlockPos> out = new ArrayList<>();
+		for(BlockPos pos : box.getContainedPos())
+			out.add(pos.immutable());
+		return out;
 	}
 
 	// Helper: collect (chunkX, chunkZ) pairs the box reports as contained.

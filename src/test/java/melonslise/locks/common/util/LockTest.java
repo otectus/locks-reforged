@@ -7,6 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Observable;
+import java.util.Observer;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import net.minecraft.nbt.CompoundTag;
 
 /**
@@ -77,5 +81,39 @@ public class LockTest
 		// Same id => same seeded shuffle. This determinism is what lets the client regenerate a dummy combo of
 		// the correct length and what the backward-compat path above relies on.
 		assertArrayEquals(pins(new Lock(555, 8, true)), pins(new Lock(555, 8, false)));
+	}
+
+	@Test
+	void setLockedIsIdempotent()
+	{
+		// Re-locking an already-locked lock must stay silent: the re-lock branches call setLocked in loops
+		// over every intersecting lockable, and a notification per redundant call would dirty chunks and
+		// push a sync packet each time.
+		//
+		// This is also why LocksUtil.closeDoors runs outside setLocked and on every lock-to-locked request
+		// rather than on the transition. If door closing hung off the observer, a lock that already reported
+		// locked would never close a door left open underneath it.
+		Lock lock = new Lock(7, 5, true);
+		AtomicInteger notifications = new AtomicInteger();
+		Observer counter = new Observer()
+		{
+			@Override
+			public void update(Observable o, Object arg)
+			{
+				notifications.incrementAndGet();
+			}
+		};
+		lock.addObserver(counter);
+
+		lock.setLocked(true);
+		assertEquals(0, notifications.get(), "re-locking an already-locked lock must not notify");
+		assertTrue(lock.isLocked());
+
+		lock.setLocked(false);
+		assertEquals(1, notifications.get(), "a real transition must notify exactly once");
+		assertFalse(lock.isLocked());
+
+		lock.setLocked(false);
+		assertEquals(1, notifications.get(), "re-opening an already-open lock must not notify");
 	}
 }

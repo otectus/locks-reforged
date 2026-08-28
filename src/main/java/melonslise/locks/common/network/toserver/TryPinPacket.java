@@ -3,8 +3,7 @@ package melonslise.locks.common.network.toserver;
 import java.util.function.Supplier;
 
 import melonslise.locks.common.container.LockPickingContainer;
-import melonslise.locks.common.init.LocksMenuTypes;
-import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.network.NetworkEvent;
 
@@ -35,15 +34,21 @@ public class TryPinPacket
 			@Override
 			public void run()
 			{
-				AbstractContainerMenu container = ctx.get().getSender().containerMenu;
-				if(container.getType() == LocksMenuTypes.LOCK_PICKING.get())
-				{
-					LockPickingContainer lpc = (LockPickingContainer) container;
-					if(pkt.pin >= 0 && pkt.pin < lpc.lockable.lock.getLength()
-						&& lpc.lockable.lock.isLocked()
-						&& lpc.isValidPick(ctx.get().getSender().getItemInHand(lpc.hand)))
-						lpc.tryPin(pkt.pin);
-				}
+				ServerPlayer sender = ctx.get().getSender();
+				if(sender == null)
+					return;
+				// instanceof, not getType(): AbstractContainerMenu#getType throws for menus built with a null
+				// type, and InventoryMenu — every player's default containerMenu — is one of those. Asking a
+				// player with no Locks screen open would have thrown.
+				if(!(sender.containerMenu instanceof LockPickingContainer lpc))
+					return;
+				// The client sends nothing but the pin. Bounds, lock state, mode, reach, config and item
+				// requirements are all re-decided here.
+				if(pkt.pin < 0 || pkt.pin >= lpc.lockable.lock.getLength())
+					return;
+				if(!lpc.canAttempt(sender))
+					return;
+				lpc.tryPin(pkt.pin);
 			}
 		});
 		ctx.get().setPacketHandled(true);

@@ -19,7 +19,7 @@ This port preserves the original mod's license: **Attribution-NonCommercial 3.0 
 
 The original Locks mod was built for Minecraft 1.16.5 (Forge 36.x). This port updates it to Minecraft 1.20.1 (Forge 47.x) while preserving all original gameplay mechanics, item IDs, config keys, and network protocol.
 
-**Version:** 1.7.0 | **Minecraft:** 1.20.1 | **Forge:** 47.2.0+ | **Java:** 17
+**Version:** 1.7.2 | **Minecraft:** 1.20.1 | **Forge:** 47.2.0+ | **Java:** 17
 
 ## Features
 
@@ -52,8 +52,30 @@ All lock and lock pick types are defined via JSON files, making it easy to add c
 >
 > Changing the mode may need a `/reload` (recipes) and a world reload (ore generation). Locks never hardcodes a specific mod's item — everything keys off the Forge tags. **Modpack authors:** if your chosen steel mod does *not* register its steel into `forge:ingots/steel` / `forge:nuggets/steel` / `forge:ores/steel`, add a small datapack tag entry so Locks can see it (or set `FORCE_NATIVE` / `EXTERNAL_ONLY` to decide explicitly).
 
+### Keys and Key Pairing
+
+A Key Blank is uncut — it opens nothing until you pair it with a lock. Pairing copies the lock's ID onto the key, and it happens **before the lock is placed**:
+
+1. Craft a **Key Blank**.
+2. Before placing the lock, put one Key Blank and the lock together in any crafting grid — the 2×2 inventory grid works, and so does a crafting table.
+3. The recipe returns the lock and gives you a **Key** carrying the same lock ID.
+4. Place the lock. That Key now unlocks and re-locks it.
+5. To make a spare, craft the paired Key together with another Key Blank.
+
+The recipe is shapeless, and only one blank is consumed per key, so shift-crafting a stack of blanks gives you one key each.
+
+> **A blank key cannot copy a lock that is already placed.** That is deliberate, not a limitation: if holding a blank against a placed lock cut a matching key, any visitor could manufacture one and the lock would protect nothing. Right-clicking a placed lock with a blank shows a reminder and changes nothing. If you placed a lock without pairing it first, remove it (sneak + empty hand on an unlocked lock), pair it, then place it again.
+
+Beyond a single key:
+
+- A **Key Ring** holds many keys at once; carrying it opens any lock whose key is inside. With Curios installed it also works from a curio slot, without occupying your hand.
+- A **Master Key** opens any lock, regardless of ID.
+- The **Awareness** enchantment binds a lock to whoever placed it, letting that player open it with no key at all.
+
 ### Lock Picking Minigame
 An interactive lock picking mechanic with a pin-matching system. Each lock has a unique combination based on its complexity. Higher-tier lock picks are more effective against tougher locks.
+
+**Itemless lock picking** is available as an opt-in server option. With `Allow Itemless Lock Picking = true`, right-clicking a locked block with an empty main hand plays the same pin minigame with no lock pick at all. Itemless attempts never consume or damage an item and are never blocked by Complexity, but a wrong pin drops every solved pin, so the minigame keeps a real failure cost. Physical lock picks are unchanged and always take precedence — as do a matching key, key ring, Curios ring, or Awareness ownership, so an empty hand never forces you into the minigame when you could simply open the lock.
 
 ### Enchantments
 
@@ -95,6 +117,7 @@ A configurable villager profession (default toolsmith) sells lock picks and lock
 Lock picks and lock mechanisms can be found in dungeon, temple, and other structure chests.
 
 ### Protection Features
+- Locked doors cannot be opened by villagers or other door-opening AI
 - Locked blocks resist redstone activation
 - Locked containers block hopper extraction
 - Locked blocks resist piston movement
@@ -206,6 +229,7 @@ Only fields present in the override are changed; omitted fields keep their defau
 - **Enchantment Toggles** -- Each of the 12 enchantments — 7 lock-side (Shocking, Sturdy, Complexity, Silent, Auto-Pick, Reinforced, Awareness) and 5 lock-pick-side (Finesse, Attunement, Grounded, Quiet Hand, Last Catch) — can be individually enabled or disabled, and the lock-pick enchantments' effects tuned, under the **Enchantments** section
 - **Shocking** subsection -- Tune Shocking damage and theft punishments (see below)
 - **Netherite Lockpick Unbreakable** -- When enabled, netherite lock picks never break during lock picking (default: false)
+- **Allow Itemless Lock Picking** -- When enabled, an empty main hand can play the lock picking minigame without a lock pick (default: false). Itemless attempts consume nothing, ignore Complexity, and reset progress on a wrong pin. Lock pick items, recipes, loot, trades and enchantments are untouched either way
 - **Loot Table Injection Patterns** -- Which loot tables receive lock pick / key injection (default: `minecraft:chests/`)
 - **Trades** subsection -- Configure villager and wandering trader sales (see below)
 
@@ -270,7 +294,7 @@ cd "Locks Reforged"
 # Build the mod JAR
 JAVA_HOME="/path/to/jdk-17" ./gradlew build
 
-# Output: build/libs/locks_reforged-1.7.0.jar
+# Output: build/libs/locks_reforged-1.7.2.jar
 
 # Run the development client
 JAVA_HOME="/path/to/jdk-17" ./gradlew runClient
@@ -279,7 +303,7 @@ JAVA_HOME="/path/to/jdk-17" ./gradlew runClient
 ## Installation
 
 1. Install [Minecraft Forge 1.20.1](https://files.minecraftforge.net/net/minecraftforge/forge/index_1.20.1.html) (47.2.0 or later)
-2. Download `locks_reforged-1.7.0.jar` from the releases
+2. Download `locks_reforged-1.7.2.jar` from the releases
 3. Place the JAR in your `.minecraft/mods/` folder
 4. Launch Minecraft with the Forge profile
 
