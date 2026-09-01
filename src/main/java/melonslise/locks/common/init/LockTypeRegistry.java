@@ -29,8 +29,18 @@ import net.minecraftforge.registries.ForgeRegistries;
 
 public final class LockTypeRegistry
 {
-	public record LockStats(int length, int enchantmentValue, int resistance, boolean fireResistant) {}
-	public record LockPickStats(float strength, boolean fireResistant, int enchantmentValue) {}
+	// pickWear is the lock pick durability a wrong pin costs on this lock; durability is the pick own
+	// pool. A pick only ever breaks when its durability runs out, so these two numbers alone decide how
+	// many mistakes a given pick is allowed on a given lock.
+	public record LockStats(int length, int enchantmentValue, int resistance, boolean fireResistant, int pickWear) {}
+	public record LockPickStats(float strength, boolean fireResistant, int enchantmentValue, int durability) {}
+
+	// Applied when a definition omits the field, so lock/lockpick JSON written for 1.7.2 keeps loading.
+	public static final int DEFAULT_PICK_WEAR = 1;
+	public static final int DEFAULT_PICK_DURABILITY = 64;
+	// A durability of 0 is legal and means the pick never wears out. It is the escape hatch for pack
+	// authors who want an unbreakable pick, and the reason the clamp below starts at 0 rather than 1.
+	public static final int UNBREAKABLE_DURABILITY = 0;
 
 	private static final Gson GSON = new GsonBuilder().create();
 
@@ -141,12 +151,12 @@ public final class LockTypeRegistry
 			Path lockExample = lockDir.resolve("_example.json.disabled");
 			if (!Files.exists(lockExample))
 				Files.writeString(lockExample,
-					"{\n  \"length\": 7,\n  \"enchantment_value\": 14,\n  \"resistance\": 12\n}\n");
+					"{\n  \"length\": 7,\n  \"enchantment_value\": 14,\n  \"resistance\": 12,\n  \"pick_wear\": 3\n}\n");
 
 			Path pickExample = pickDir.resolve("_example.json.disabled");
 			if (!Files.exists(pickExample))
 				Files.writeString(pickExample,
-					"{\n  \"strength\": 0.35,\n  \"enchantment_value\": 10\n}\n");
+					"{\n  \"strength\": 0.35,\n  \"enchantment_value\": 10,\n  \"durability\": 96\n}\n");
 		}
 		catch (IOException e)
 		{
@@ -196,7 +206,9 @@ public final class LockTypeRegistry
 		int enchantmentValue = clampWarn(id, "enchantment_value", GsonHelper.getAsInt(json, "enchantment_value"), 1, 50);
 		int resistance = clampWarn(id, "resistance", GsonHelper.getAsInt(json, "resistance"), 0, 1000);
 		boolean fireResistant = json.has("fire_resistant") && GsonHelper.getAsBoolean(json, "fire_resistant");
-		LOCK_DEFAULTS.put(id, new LockStats(length, enchantmentValue, resistance, fireResistant));
+		int pickWear = json.has("pick_wear")
+			? clampWarn(id, "pick_wear", GsonHelper.getAsInt(json, "pick_wear"), 1, 1000) : DEFAULT_PICK_WEAR;
+		LOCK_DEFAULTS.put(id, new LockStats(length, enchantmentValue, resistance, fireResistant, pickWear));
 	}
 
 	private static void parseLockPickDefinition(ResourceLocation id, JsonObject json)
@@ -210,7 +222,10 @@ public final class LockTypeRegistry
 		boolean fireResistant = json.has("fire_resistant") && GsonHelper.getAsBoolean(json, "fire_resistant");
 		int enchantmentValue = json.has("enchantment_value")
 			? clampWarn(id, "enchantment_value", GsonHelper.getAsInt(json, "enchantment_value"), 0, 50) : 0;
-		LOCKPICK_DEFAULTS.put(id, new LockPickStats(raw, fireResistant, enchantmentValue));
+		int durability = json.has("durability")
+			? clampWarn(id, "durability", GsonHelper.getAsInt(json, "durability"), UNBREAKABLE_DURABILITY, 10000)
+			: DEFAULT_PICK_DURABILITY;
+		LOCKPICK_DEFAULTS.put(id, new LockPickStats(raw, fireResistant, enchantmentValue, durability));
 	}
 
 	private static int clampWarn(ResourceLocation id, String field, int value, int min, int max)
@@ -230,7 +245,7 @@ public final class LockTypeRegistry
 		LocksConfig.applyConfigStatOverrides();
 	}
 
-	public static void applyConfigLockOverride(ResourceLocation id, int length, int enchant, int resistance)
+	public static void applyConfigLockOverride(ResourceLocation id, int length, int enchant, int resistance, int pickWear)
 	{
 		LockStats base = LOCK_STATS.get(id);
 		if (base == null)
@@ -241,7 +256,8 @@ public final class LockTypeRegistry
 		int l = length >= 0 ? length : base.length();
 		int e = enchant >= 0 ? enchant : base.enchantmentValue();
 		int r = resistance >= 0 ? resistance : base.resistance();
-		LOCK_STATS.put(id, new LockStats(l, e, r, base.fireResistant()));
+		int w = pickWear >= 0 ? pickWear : base.pickWear();
+		LOCK_STATS.put(id, new LockStats(l, e, r, base.fireResistant(), w));
 		Locks.LOGGER.debug("Applied TOML config override for lock {}", id);
 	}
 
@@ -253,7 +269,8 @@ public final class LockTypeRegistry
 			Locks.LOGGER.warn("TOML config references unknown lockpick: {}", id);
 			return;
 		}
-		LOCKPICK_STATS.put(id, new LockPickStats(strength, base.fireResistant(), base.enchantmentValue()));
+		// durability is intentionally carried over untouched: it is fixed at item registration.
+		LOCKPICK_STATS.put(id, new LockPickStats(strength, base.fireResistant(), base.enchantmentValue(), base.durability()));
 		Locks.LOGGER.debug("Applied TOML config override for lockpick {}", id);
 	}
 
@@ -274,8 +291,9 @@ public final class LockTypeRegistry
 			int length = json.has("length") ? GsonHelper.getAsInt(json, "length") : base.length();
 			int enchVal = json.has("enchantment_value") ? GsonHelper.getAsInt(json, "enchantment_value") : base.enchantmentValue();
 			int resist = json.has("resistance") ? GsonHelper.getAsInt(json, "resistance") : base.resistance();
+			int pickWear = json.has("pick_wear") ? GsonHelper.getAsInt(json, "pick_wear") : base.pickWear();
 
-			LOCK_STATS.put(itemId, new LockStats(length, enchVal, resist, base.fireResistant()));
+			LOCK_STATS.put(itemId, new LockStats(length, enchVal, resist, base.fireResistant(), pickWear));
 			Locks.LOGGER.debug("Applied lock stat override for {}", itemId);
 		}
 	}
@@ -296,8 +314,12 @@ public final class LockTypeRegistry
 
 			float strength = json.has("strength") ? GsonHelper.getAsFloat(json, "strength") : base.strength();
 			int enchVal = json.has("enchantment_value") ? GsonHelper.getAsInt(json, "enchantment_value") : base.enchantmentValue();
+			// Durability is baked into Item.Properties at registration, long before any datapack loads, so a
+			// datapack cannot move it. Warn rather than reporting a number the item does not actually have.
+			if (json.has("durability"))
+				Locks.LOGGER.warn("Lockpick stat override for {} sets a durability, which cannot change an already-registered item. Use config/locks/lockpick_types instead.", itemId);
 
-			LOCKPICK_STATS.put(itemId, new LockPickStats(strength, base.fireResistant(), enchVal));
+			LOCKPICK_STATS.put(itemId, new LockPickStats(strength, base.fireResistant(), enchVal, base.durability()));
 			Locks.LOGGER.debug("Applied lockpick stat override for {}", itemId);
 		}
 	}
@@ -309,7 +331,7 @@ public final class LockTypeRegistry
 		if (stats == null)
 		{
 			Locks.LOGGER.error("No lock stats found for item: {}. Using fallback.", id);
-			return new LockStats(5, 10, 4, false);
+			return new LockStats(5, 10, 4, false, DEFAULT_PICK_WEAR);
 		}
 		return stats;
 	}
@@ -321,7 +343,7 @@ public final class LockTypeRegistry
 		if (stats == null)
 		{
 			Locks.LOGGER.error("No lockpick stats found for item: {}. Using fallback.", id);
-			return new LockPickStats(0.2f, false, 0);
+			return new LockPickStats(0.2f, false, 0, DEFAULT_PICK_DURABILITY);
 		}
 		return stats;
 	}

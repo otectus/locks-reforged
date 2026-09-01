@@ -9,6 +9,7 @@ import melonslise.locks.common.config.LocksServerConfig;
 import melonslise.locks.common.init.LocksCapabilities;
 import melonslise.locks.common.init.LocksMenuTypes;
 import melonslise.locks.common.init.LocksEnchantments;
+import melonslise.locks.common.init.LockTypeRegistry;
 import melonslise.locks.common.init.LocksItemTags;
 import melonslise.locks.common.init.LocksTagHelper;
 import melonslise.locks.common.init.LocksNetwork;
@@ -103,8 +104,7 @@ public class LockPickingContainer extends AbstractContainerMenu
 	// The single gate for "may this player still act on this session", shared by stillValid (polled every
 	// tick) and TryPinPacket, so a pin can never be accepted under conditions that would have closed the menu.
 	//
-	// Only ITEM_BACKED ever touches pick code: an itemless hand is empty, and the LockPickItem stat helpers
-	// write NBT on read, so they must never see air.
+	// Only ITEM_BACKED ever touches pick code: an itemless hand is empty and has no durability to spend.
 	public boolean canAttempt(Player player)
 	{
 		return LockPickingPolicy.isSessionValid(
@@ -139,9 +139,9 @@ public class LockPickingContainer extends AbstractContainerMenu
 		if(this.isOpen())
 			return;
 		boolean correct = this.lockable.lock.checkPin(this.currIndex, currPin);
-		// && short-circuits, so an itemless attempt never enters tryBreakPick at all: no durability, no
-		// break event, no replacement-pick scan, and no stat helper ever sees an empty stack.
-		boolean pickBroke = LockPickingPolicy.shouldRollPickBreak(this.mode, correct) && this.tryBreakPick(player, currPin);
+		// && short-circuits, so an itemless attempt never enters wearPick at all: no durability spent, no
+		// break event, and no replacement-pick scan.
+		boolean pickBroke = LockPickingPolicy.shouldWearPick(this.mode, correct) && this.wearPick(player, currPin);
 		PinOutcome outcome = LockPickingPolicy.resolve(this.mode, correct, pickBroke);
 
 		if(correct)
@@ -186,7 +186,10 @@ public class LockPickingContainer extends AbstractContainerMenu
 			this.reset();
 	}
 
-	protected boolean tryBreakPick(Player player, int pin)
+	// Spends pick durability for one wrong pin and reports whether that finished the pick. Replaces the
+	// 1.7.2 random break roll, which deleted the whole item on a losing throw: the cost is now fixed by
+	// the LOCK being picked, and the pick dies only when its own pool runs out.
+	protected boolean wearPick(Player player, int pin)
 	{
 		ItemStack pickStack = player.getItemInHand(this.hand);
 		if (!LocksTagHelper.isLockPick(pickStack))
@@ -194,50 +197,50 @@ public class LockPickingContainer extends AbstractContainerMenu
 		if (LocksServerConfig.NETHERITE_PICK_UNBREAKABLE.get()
 			&& LockPickItem.isNetheriteLockPick(pickStack))
 			return false;
-		float sturdyModifier = this.sturdy == 0 ? 1f : 0.75f + this.sturdy * 0.5f;
-		float strength = LockPickItem.getOrSetStrength(pickStack);
-		int finesse = LocksServerConfig.ENABLE_FINESSE.get()
-			? EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.FINESSE.get(), pickStack) : 0;
-		if (finesse > 0)
-			strength *= 1f + finesse * (float) (double) LocksServerConfig.FINESSE_STRENGTH_PER_LEVEL.get();
-		float ch = strength / sturdyModifier;
-		float ex = (1f - ch) * (1f - this.getBreakChanceMultiplier(pin));
-		float survive = ex + ch;
-		// Finesse can never make a pick unbreakable: keep at least a 5% break chance when it is boosting.
-		if (finesse > 0)
-			survive = Math.min(survive, 0.95f);
-
-		if (player.level().getRandom().nextFloat() < survive)
+		// A pick registered without a durability pool (definition durability 0, or a third-party tagged
+		// item that is not damageable) simply never wears down.
+		if (!LockPickItem.usesDurability(pickStack))
 			return false;
-		// Last Catch: one more chance to save the pick before it breaks.
+		// Last Catch is the only die roll left anywhere in this path, and it can only ever SAVE durability.
+		// It never breaks anything, so a pick still dies exactly when its pool hits zero and not before.
 		int lastCatch = LocksServerConfig.ENABLE_LAST_CATCH.get()
 			? EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.LAST_CATCH.get(), pickStack) : 0;
 		if (lastCatch > 0 && player.level().getRandom().nextFloat() < (float) (double) LocksServerConfig.LAST_CATCH_SAVE_CHANCE.get())
 			return false;
-		if (LockPickItem.usesDurability(pickStack))
-			LockPickItem.damagePick(pickStack, player, this.hand);
-		else
+		int finesse = LocksServerConfig.ENABLE_FINESSE.get()
+			? EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.FINESSE.get(), pickStack) : 0;
+		int wear = LockPickWearPolicy.wearFor(
+			LockTypeRegistry.getLockStats(this.lockable.stack.getItem()).pickWear(),
+			this.isNearMiss(pin),
+			LocksServerConfig.NEAR_MISS_WEAR_MULTIPLIER.get(),
+			this.sturdy,
+			LocksServerConfig.STURDY_WEAR_PER_LEVEL.get(),
+			finesse,
+			LocksServerConfig.FINESSE_WEAR_REDUCTION_PER_LEVEL.get());
+		LockPickItem.damagePick(pickStack, player, this.hand, wear);
+		// hurtAndBreak empties the stack on the hit that finishes it, and picks stack to 1, so the stack is
+		// the exact answer to "did it break" — including when Unbreaking silently ate the damage, and when
+		// creative mode ignored it outright. Never predict this; ask the item.
+		if (!pickStack.isEmpty())
+			return false;
+		for (int a = 0; a < player.getInventory().getContainerSize(); ++a)
 		{
-			this.player.broadcastBreakEvent(this.hand);
-			pickStack.shrink(1);
-		}
-		if (pickStack.isEmpty())
-			for (int a = 0; a < player.getInventory().getContainerSize(); ++a)
+			ItemStack stack = player.getInventory().getItem(a);
+			if (this.isValidPick(stack))
 			{
-				ItemStack stack = player.getInventory().getItem(a);
-				if (this.isValidPick(stack))
-				{
-					player.setItemInHand(hand, stack);
-					player.getInventory().removeItemNoUpdate(a);
-					break;
-				}
+				player.setItemInHand(hand, stack);
+				player.getInventory().removeItemNoUpdate(a);
+				break;
 			}
+		}
 		return true;
 	}
 
-	protected float getBreakChanceMultiplier(int pin)
+	// Off by exactly one pin: the guess was nearly right, so the pick is only lightly strained. This was
+	// the 0.33 break-chance multiplier in 1.7.2 and is now a wear multiplier.
+	protected boolean isNearMiss(int pin)
 	{
-		return Math.abs(this.lockable.lock.getPin(this.currIndex) - pin) == 1 ? 0.33f : 1f;
+		return Math.abs(this.lockable.lock.getPin(this.currIndex) - pin) == 1;
 	}
 
 	@Override

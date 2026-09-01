@@ -1,1 +1,5 @@
-{"strength": 0.2, "enchantment_value": 5}
+{
+  "strength": 0.2,
+  "enchantment_value": 5,
+  "durability": 32
+}

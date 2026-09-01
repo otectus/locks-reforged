@@ -1,5 +1,45 @@
 # Locks Reforged Changelog
 
+## 1.7.3
+
+### Lock picks now use durability instead of a random break chance
+
+- **A lock pick no longer vanishes on a coin flip.** Every wrong pin used to roll against the pick's strength and, on a losing roll, destroy the whole item — a fresh wood pick was gone on 80% of far misses, sometimes on the very first guess, with nothing to show for it. A wrong pin now costs the pick a fixed amount of durability, and the pick breaks only when that durability reaches zero. The durability bar tells you exactly how many mistakes you have left.
+- **The lock decides the cost.** Each lock tier carries a new `pick_wear` stat — the durability one wrong pin takes off whatever pick you are holding. Wood costs 1, iron 3, steel 6, diamond 12, netherite 24. Picking a netherite lock chews through a pick twenty-four times faster than picking a wood one, so lock tier is now a real economic defence and not just a longer combination.
+- **Every pick tier has durability**, not just netherite: wood 32, gold 40, copper 48, iron 96, steel 192, diamond 384, netherite 768. The ladder is tuned so a pick gets roughly **32 wrong pins against a lock of its own tier**. Take a wood pick to a netherite lock and a single mistake ends it; take a netherite pick to a wood lock and it will outlast your patience.
+- A guess that is off by exactly one pin still costs about a third as much, replacing the old 0.33 break-chance multiplier — and never rounds down to nothing.
+- **Pick strength no longer affects breakage at all.** It now does one job: deciding which locks a pick may attempt in the first place (the Complexity gate). Raising `Lockpick Strength` in the config no longer makes a pick harder to break; set `durability` in `config/locks/lockpick_types/` for that.
+
+### Enchantments carried over to the durability model
+
+- **Sturdy** (on the lock) now makes each wrong pin cost +50% durability per level, replacing its old divisor on pick strength. Tunable as `Sturdy Wear Per Level`.
+- **Finesse** (on the pick) now removes 15% of the durability cost per level. A wrong pin always costs at least 1 durability, so no combination of levels and config values can make picking free — the durability-era successor to the old "never fully unbreakable" clamp.
+- **Last Catch** now has its ~20% chance to cancel the durability cost of a wrong pin entirely. It is the only die roll left anywhere in the break path, and it can only ever *save* durability: a pick still dies exactly when its pool hits zero and never before.
+- `Finesse Strength Per Level` has been replaced by **`Finesse Wear Reduction Per Level`** (same 0.15 default). The old key described a break-roll bonus that no longer exists; it will simply sit unused in an existing config file.
+- Added **`Near Miss Wear Multiplier`** (default 0.33), which was a hardcoded constant before.
+- **Shocking's pick-break trigger now fires far less often**, because a pick only breaks when its durability runs out. Turn on `Shocking Triggers On Wrong Pin` for something closer to the old frequency.
+
+### Consequences worth knowing before you update
+
+- **Lock picks stack to one now.** Durability makes them proper tools, which in Minecraft means a stack size of one. Crafting recipes for the copper, gold, iron, steel and diamond picks now yield **1** instead of 2, and villager and wandering-trader pick trades sell 1 per trade instead of 2 at the same emerald price. Loot tables are unchanged — chests that roll several picks now hand them over as separate single items.
+- Existing worlds holding a stack of several picks will load fine; the stack clamps to one as it is moved.
+- **Picks can be repaired and enchanted like tools.** Mending works on every tier, and Unbreaking applied at an anvil genuinely reduces wear. Anvil repair with a material ingot is still netherite-only.
+- A pick registered with `"durability": 0` is deliberately unbreakable and stays stackable — the escape hatch for pack authors who want the pre-1.7.0 "picks never break" feel. Third-party items in the `locks:lock_picks` tag that are not damageable are now unbreakable rather than consumed.
+- Pick **durability** cannot be changed by a datapack stat override or by the TOML config: it is baked into the item at registration, before either is read. A datapack that tries logs a warning. Use `config/locks/lockpick_types/<name>.json`, which is read before registration.
+- **The network protocol is unchanged at `3`.** A worn-but-alive pick is already indistinguishable on the wire from any other wrong pin, so 1.7.3 clients and servers talk to 1.7.2 ones at the protocol level — but the gameplay differs, so update both sides anyway.
+
+### Configuration
+
+- New per-lock **`Pick Wear`** entries under `[Lock Stats]` in `locks-common.toml`, and a new `pick_wear` field in lock JSON definitions and datapack lock stat overrides.
+- New `durability` field in lock pick JSON definitions.
+- New `Sturdy Wear Per Level` and `Near Miss Wear Multiplier` under `[Enchantments.Lock Pick]` in `locks-server.toml`.
+
+### Internal
+
+- The wear arithmetic lives in a new `common/container/LockPickWearPolicy`, a pure static class in the same style as `LockPickingPolicy`, covered by 10 unit tests (71 in the suite). `LockPickingContainer#tryBreakPick` became `#wearPick` and `LockPickingPolicy#shouldRollPickBreak` became `#shouldWearPick`.
+- Whether a pick actually broke is read off the ItemStack after the damage lands rather than predicted, so Unbreaking eating a hit and creative mode ignoring one both give the right answer.
+- `LockPickItem#getOrSetStrength` was replaced by a read-only `#getStrength`. The old version wrote NBT on every read, which meant a pick that had merely been looked at stopped stacking with a fresh one and every caller had to guarantee it never saw an empty stack.
+
 ## 1.7.2
 
 ### Awareness locks no longer shut their own owner out

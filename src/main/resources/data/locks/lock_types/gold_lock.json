@@ -1,1 +1,6 @@
-{"length":6,"enchantment_value":22,"resistance":6}
+{
+  "length": 6,
+  "enchantment_value": 22,
+  "resistance": 6,
+  "pick_wear": 2
+}

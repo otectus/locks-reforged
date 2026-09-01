@@ -30,13 +30,13 @@ public final class LocksConfig
 	public static final ForgeConfigSpec.BooleanValue RANDOMIZE_LOADED_LOCKS;
 
 	// Lock stat overrides (sentinel -1 = use JSON default)
-	public static final ForgeConfigSpec.IntValue WOOD_LOCK_LENGTH, WOOD_LOCK_ENCHANT, WOOD_LOCK_RESISTANCE;
-	public static final ForgeConfigSpec.IntValue COPPER_LOCK_LENGTH, COPPER_LOCK_ENCHANT, COPPER_LOCK_RESISTANCE;
-	public static final ForgeConfigSpec.IntValue IRON_LOCK_LENGTH, IRON_LOCK_ENCHANT, IRON_LOCK_RESISTANCE;
-	public static final ForgeConfigSpec.IntValue STEEL_LOCK_LENGTH, STEEL_LOCK_ENCHANT, STEEL_LOCK_RESISTANCE;
-	public static final ForgeConfigSpec.IntValue GOLD_LOCK_LENGTH, GOLD_LOCK_ENCHANT, GOLD_LOCK_RESISTANCE;
-	public static final ForgeConfigSpec.IntValue DIAMOND_LOCK_LENGTH, DIAMOND_LOCK_ENCHANT, DIAMOND_LOCK_RESISTANCE;
-	public static final ForgeConfigSpec.IntValue NETHERITE_LOCK_LENGTH, NETHERITE_LOCK_ENCHANT, NETHERITE_LOCK_RESISTANCE;
+	public static final ForgeConfigSpec.IntValue WOOD_LOCK_LENGTH, WOOD_LOCK_ENCHANT, WOOD_LOCK_RESISTANCE, WOOD_LOCK_PICK_WEAR;
+	public static final ForgeConfigSpec.IntValue COPPER_LOCK_LENGTH, COPPER_LOCK_ENCHANT, COPPER_LOCK_RESISTANCE, COPPER_LOCK_PICK_WEAR;
+	public static final ForgeConfigSpec.IntValue IRON_LOCK_LENGTH, IRON_LOCK_ENCHANT, IRON_LOCK_RESISTANCE, IRON_LOCK_PICK_WEAR;
+	public static final ForgeConfigSpec.IntValue STEEL_LOCK_LENGTH, STEEL_LOCK_ENCHANT, STEEL_LOCK_RESISTANCE, STEEL_LOCK_PICK_WEAR;
+	public static final ForgeConfigSpec.IntValue GOLD_LOCK_LENGTH, GOLD_LOCK_ENCHANT, GOLD_LOCK_RESISTANCE, GOLD_LOCK_PICK_WEAR;
+	public static final ForgeConfigSpec.IntValue DIAMOND_LOCK_LENGTH, DIAMOND_LOCK_ENCHANT, DIAMOND_LOCK_RESISTANCE, DIAMOND_LOCK_PICK_WEAR;
+	public static final ForgeConfigSpec.IntValue NETHERITE_LOCK_LENGTH, NETHERITE_LOCK_ENCHANT, NETHERITE_LOCK_RESISTANCE, NETHERITE_LOCK_PICK_WEAR;
 
 	// Lockpick stat overrides (sentinel -1.0 = use JSON default)
 	public static final ForgeConfigSpec.DoubleValue WOOD_PICK_STRENGTH, COPPER_PICK_STRENGTH, IRON_PICK_STRENGTH, STEEL_PICK_STRENGTH;
@@ -80,54 +80,67 @@ public final class LocksConfig
 			.define("Randomize Loaded Locks", false);
 
 		// Lock Stats section
-		cfg.comment("Override built-in lock stats without datapacks. Set any value to -1 to use the JSON default.").push("Lock Stats");
+		cfg.comment("Override built-in lock stats without datapacks. Set any value to -1 to use the JSON default.",
+				"'Pick Wear' is how much durability this lock takes off a lock pick on every wrong pin. It is the",
+				"main difficulty knob alongside 'Length', since a pick breaks only when its durability runs out.").push("Lock Stats");
 
 		cfg.push("Wood Lock");
 		WOOD_LOCK_LENGTH = cfg.comment("Number of pins (1-20). JSON default: 5. Set to -1 to use default.").defineInRange("Length", -1, -1, 20);
 		WOOD_LOCK_ENCHANT = cfg.comment("Enchantability (1-50). JSON default: 15.").defineInRange("Enchantment Value", -1, -1, 50);
 		WOOD_LOCK_RESISTANCE = cfg.comment("Explosion resistance (0-1000). JSON default: 4.").defineInRange("Resistance", -1, -1, 1000);
+		WOOD_LOCK_PICK_WEAR = cfg.comment("Lock pick durability a wrong pin costs on this lock (1-1000). JSON default: 1.").defineInRange("Pick Wear", -1, -1, 1000);
 		cfg.pop();
 
 		cfg.push("Copper Lock");
 		COPPER_LOCK_LENGTH = cfg.comment("Number of pins (1-20). JSON default: 6. Set to -1 to use default.").defineInRange("Length", -1, -1, 20);
 		COPPER_LOCK_ENCHANT = cfg.comment("Enchantability (1-50). JSON default: 16.").defineInRange("Enchantment Value", -1, -1, 50);
 		COPPER_LOCK_RESISTANCE = cfg.comment("Explosion resistance (0-1000). JSON default: 8.").defineInRange("Resistance", -1, -1, 1000);
+		COPPER_LOCK_PICK_WEAR = cfg.comment("Lock pick durability a wrong pin costs on this lock (1-1000). JSON default: 2.").defineInRange("Pick Wear", -1, -1, 1000);
 		cfg.pop();
 
 		cfg.push("Iron Lock");
 		IRON_LOCK_LENGTH = cfg.comment("Number of pins (1-20). JSON default: 7. Set to -1 to use default.").defineInRange("Length", -1, -1, 20);
 		IRON_LOCK_ENCHANT = cfg.comment("Enchantability (1-50). JSON default: 14.").defineInRange("Enchantment Value", -1, -1, 50);
 		IRON_LOCK_RESISTANCE = cfg.comment("Explosion resistance (0-1000). JSON default: 12.").defineInRange("Resistance", -1, -1, 1000);
+		IRON_LOCK_PICK_WEAR = cfg.comment("Lock pick durability a wrong pin costs on this lock (1-1000). JSON default: 3.").defineInRange("Pick Wear", -1, -1, 1000);
 		cfg.pop();
 
 		cfg.push("Steel Lock");
 		STEEL_LOCK_LENGTH = cfg.comment("Number of pins (1-20). JSON default: 9. Set to -1 to use default.").defineInRange("Length", -1, -1, 20);
 		STEEL_LOCK_ENCHANT = cfg.comment("Enchantability (1-50). JSON default: 12.").defineInRange("Enchantment Value", -1, -1, 50);
 		STEEL_LOCK_RESISTANCE = cfg.comment("Explosion resistance (0-1000). JSON default: 20.").defineInRange("Resistance", -1, -1, 1000);
+		STEEL_LOCK_PICK_WEAR = cfg.comment("Lock pick durability a wrong pin costs on this lock (1-1000). JSON default: 6.").defineInRange("Pick Wear", -1, -1, 1000);
 		cfg.pop();
 
 		cfg.push("Gold Lock");
 		GOLD_LOCK_LENGTH = cfg.comment("Number of pins (1-20). JSON default: 6. Set to -1 to use default.").defineInRange("Length", -1, -1, 20);
 		GOLD_LOCK_ENCHANT = cfg.comment("Enchantability (1-50). JSON default: 22.").defineInRange("Enchantment Value", -1, -1, 50);
 		GOLD_LOCK_RESISTANCE = cfg.comment("Explosion resistance (0-1000). JSON default: 6.").defineInRange("Resistance", -1, -1, 1000);
+		GOLD_LOCK_PICK_WEAR = cfg.comment("Lock pick durability a wrong pin costs on this lock (1-1000). JSON default: 2.").defineInRange("Pick Wear", -1, -1, 1000);
 		cfg.pop();
 
 		cfg.push("Diamond Lock");
 		DIAMOND_LOCK_LENGTH = cfg.comment("Number of pins (1-20). JSON default: 11. Set to -1 to use default.").defineInRange("Length", -1, -1, 20);
 		DIAMOND_LOCK_ENCHANT = cfg.comment("Enchantability (1-50). JSON default: 10.").defineInRange("Enchantment Value", -1, -1, 50);
 		DIAMOND_LOCK_RESISTANCE = cfg.comment("Explosion resistance (0-1000). JSON default: 100.").defineInRange("Resistance", -1, -1, 1000);
+		DIAMOND_LOCK_PICK_WEAR = cfg.comment("Lock pick durability a wrong pin costs on this lock (1-1000). JSON default: 12.").defineInRange("Pick Wear", -1, -1, 1000);
 		cfg.pop();
 
 		cfg.push("Netherite Lock");
 		NETHERITE_LOCK_LENGTH = cfg.comment("Number of pins (1-20). JSON default: 14. Set to -1 to use default.").defineInRange("Length", -1, -1, 20);
 		NETHERITE_LOCK_ENCHANT = cfg.comment("Enchantability (1-50). JSON default: 8.").defineInRange("Enchantment Value", -1, -1, 50);
 		NETHERITE_LOCK_RESISTANCE = cfg.comment("Explosion resistance (0-1000). JSON default: 200.").defineInRange("Resistance", -1, -1, 1000);
+		NETHERITE_LOCK_PICK_WEAR = cfg.comment("Lock pick durability a wrong pin costs on this lock (1-1000). JSON default: 24.").defineInRange("Pick Wear", -1, -1, 1000);
 		cfg.pop();
 
 		cfg.pop(); // Lock Stats
 
 		// Lockpick Stats section
-		cfg.comment("Override built-in lockpick stats without datapacks. Set any value to -1.0 to use the JSON default.").push("Lockpick Stats");
+		cfg.comment("Override built-in lockpick stats without datapacks. Set any value to -1.0 to use the JSON default.",
+				"Strength decides which locks a pick may attempt at all (the Complexity gate). Since 1.7.3 it no",
+				"longer affects how fast a pick wears out - that is the lock's 'Pick Wear' above.",
+				"Durability cannot be set here: it is fixed when the item is registered, before this file is read.",
+				"Set it in config/locks/lockpick_types/<pick>.json instead.").push("Lockpick Stats");
 		WOOD_PICK_STRENGTH = cfg.comment("Strength (0.01-10.0). JSON default: 0.2. Set to -1.0 to use default.").defineInRange("Wood Lockpick Strength", -1.0, -1.0, 10.0);
 		COPPER_PICK_STRENGTH = cfg.comment("Strength (0.01-10.0). JSON default: 0.28.").defineInRange("Copper Lockpick Strength", -1.0, -1.0, 10.0);
 		IRON_PICK_STRENGTH = cfg.comment("Strength (0.01-10.0). JSON default: 0.35.").defineInRange("Iron Lockpick Strength", -1.0, -1.0, 10.0);
@@ -294,13 +307,13 @@ public final class LocksConfig
 		if (!SPEC.isLoaded())
 			return;
 
-		applyLockConfigOverride("wood_lock", WOOD_LOCK_LENGTH, WOOD_LOCK_ENCHANT, WOOD_LOCK_RESISTANCE);
-		applyLockConfigOverride("copper_lock", COPPER_LOCK_LENGTH, COPPER_LOCK_ENCHANT, COPPER_LOCK_RESISTANCE);
-		applyLockConfigOverride("iron_lock", IRON_LOCK_LENGTH, IRON_LOCK_ENCHANT, IRON_LOCK_RESISTANCE);
-		applyLockConfigOverride("steel_lock", STEEL_LOCK_LENGTH, STEEL_LOCK_ENCHANT, STEEL_LOCK_RESISTANCE);
-		applyLockConfigOverride("gold_lock", GOLD_LOCK_LENGTH, GOLD_LOCK_ENCHANT, GOLD_LOCK_RESISTANCE);
-		applyLockConfigOverride("diamond_lock", DIAMOND_LOCK_LENGTH, DIAMOND_LOCK_ENCHANT, DIAMOND_LOCK_RESISTANCE);
-		applyLockConfigOverride("netherite_lock", NETHERITE_LOCK_LENGTH, NETHERITE_LOCK_ENCHANT, NETHERITE_LOCK_RESISTANCE);
+		applyLockConfigOverride("wood_lock", WOOD_LOCK_LENGTH, WOOD_LOCK_ENCHANT, WOOD_LOCK_RESISTANCE, WOOD_LOCK_PICK_WEAR);
+		applyLockConfigOverride("copper_lock", COPPER_LOCK_LENGTH, COPPER_LOCK_ENCHANT, COPPER_LOCK_RESISTANCE, COPPER_LOCK_PICK_WEAR);
+		applyLockConfigOverride("iron_lock", IRON_LOCK_LENGTH, IRON_LOCK_ENCHANT, IRON_LOCK_RESISTANCE, IRON_LOCK_PICK_WEAR);
+		applyLockConfigOverride("steel_lock", STEEL_LOCK_LENGTH, STEEL_LOCK_ENCHANT, STEEL_LOCK_RESISTANCE, STEEL_LOCK_PICK_WEAR);
+		applyLockConfigOverride("gold_lock", GOLD_LOCK_LENGTH, GOLD_LOCK_ENCHANT, GOLD_LOCK_RESISTANCE, GOLD_LOCK_PICK_WEAR);
+		applyLockConfigOverride("diamond_lock", DIAMOND_LOCK_LENGTH, DIAMOND_LOCK_ENCHANT, DIAMOND_LOCK_RESISTANCE, DIAMOND_LOCK_PICK_WEAR);
+		applyLockConfigOverride("netherite_lock", NETHERITE_LOCK_LENGTH, NETHERITE_LOCK_ENCHANT, NETHERITE_LOCK_RESISTANCE, NETHERITE_LOCK_PICK_WEAR);
 
 		applyPickConfigOverride("wood_lock_pick", WOOD_PICK_STRENGTH);
 		applyPickConfigOverride("copper_lock_pick", COPPER_PICK_STRENGTH);
@@ -311,15 +324,16 @@ public final class LocksConfig
 		applyPickConfigOverride("netherite_lock_pick", NETHERITE_PICK_STRENGTH);
 	}
 
-	private static void applyLockConfigOverride(String name, ForgeConfigSpec.IntValue length, ForgeConfigSpec.IntValue enchant, ForgeConfigSpec.IntValue resistance)
+	private static void applyLockConfigOverride(String name, ForgeConfigSpec.IntValue length, ForgeConfigSpec.IntValue enchant, ForgeConfigSpec.IntValue resistance, ForgeConfigSpec.IntValue pickWear)
 	{
 		int l = length.get();
 		int e = enchant.get();
 		int r = resistance.get();
-		if (l >= 0 || e >= 0 || r >= 0)
+		int w = pickWear.get();
+		if (l >= 0 || e >= 0 || r >= 0 || w >= 0)
 		{
 			ResourceLocation id = new ResourceLocation(Locks.ID, name);
-			LockTypeRegistry.applyConfigLockOverride(id, l, e, r);
+			LockTypeRegistry.applyConfigLockOverride(id, l, e, r, w);
 		}
 	}
 

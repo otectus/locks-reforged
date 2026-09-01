@@ -19,7 +19,7 @@ This port preserves the original mod's license: **Attribution-NonCommercial 3.0 
 
 The original Locks mod was built for Minecraft 1.16.5 (Forge 36.x). This port updates it to Minecraft 1.20.1 (Forge 47.x) while preserving all original gameplay mechanics, item IDs, config keys, and network protocol.
 
-**Version:** 1.7.2 | **Minecraft:** 1.20.1 | **Forge:** 47.2.0+ | **Java:** 17
+**Version:** 1.7.3 | **Minecraft:** 1.20.1 | **Forge:** 47.2.0+ | **Java:** 17
 
 ## Features
 
@@ -75,6 +75,20 @@ Beyond a single key:
 ### Lock Picking Minigame
 An interactive lock picking mechanic with a pin-matching system. Each lock has a unique combination based on its complexity. Higher-tier lock picks are more effective against tougher locks.
 
+**Lock picks use durability (new in 1.7.3).** Every wrong pin costs the held pick a fixed amount of durability, and the pick breaks only when that durability reaches zero — there is no random break chance any more. How much a mistake costs is decided by the **lock** you are picking (its `pick_wear`), so a wrong pin on a netherite lock chews through a pick far faster than one on a wood lock. A pick's own `durability` decides how many of those mistakes it can absorb. The shipped values give a pick roughly **32 mistakes against a lock of its own tier**; take a wood pick to a netherite lock and a single wrong pin ends it.
+
+| Tier | Pick durability | Lock `pick_wear` | Wrong pins, same tier |
+|------|-----------------|------------------|-----------------------|
+| Wood | 32 | 1 | 32 |
+| Gold | 40 | 2 | 20 |
+| Copper | 48 | 2 | 24 |
+| Iron | 96 | 3 | 32 |
+| Steel | 192 | 6 | 32 |
+| Diamond | 384 | 12 | 32 |
+| Netherite | 768 | 24 | 32 |
+
+A guess that is off by exactly one pin costs about a third as much (never less than 1). Because picks are now damageable tools they stack to one, and Mending or an anvil-applied Unbreaking work on every tier. `strength` no longer affects breakage at all — it decides only which locks a pick may attempt in the first place (the Complexity gate).
+
 **Itemless lock picking** is available as an opt-in server option. With `Allow Itemless Lock Picking = true`, right-clicking a locked block with an empty main hand plays the same pin minigame with no lock pick at all. Itemless attempts never consume or damage an item and are never blocked by Complexity, but a wrong pin drops every solved pin, so the minigame keeps a real failure cost. Physical lock picks are unchanged and always take precedence — as do a matching key, key ring, Curios ring, or Awareness ownership, so an empty hand never forces you into the minigame when you could simply open the lock.
 
 ### Enchantments
@@ -86,7 +100,7 @@ Locks define resistance; lock picks define technique. **Lock enchantments** go o
 | Enchantment | Max Level | Effect |
 |-------------|-----------|--------|
 | **Shocking** | V | Electrocutes players who fail to pick the lock (bypasses armor) |
-| **Sturdy** | III | Reduces lock pick effectiveness against the lock |
+| **Sturdy** | III | Makes every wrong pin cost the lock pick more durability |
 | **Complexity** | III | Makes the lock impossible to pick with lower-tier lock picks |
 | **Silent** | I | Suppresses the rattle sound when access is denied. Incompatible with Shocking |
 | **Auto-Pick** | III | 10%/20%/30% chance to instantly open the lock, bypassing the minigame. Incompatible with Complexity |
@@ -97,11 +111,11 @@ Locks define resistance; lock picks define technique. **Lock enchantments** go o
 
 | Enchantment | Max Level | Effect |
 |-------------|-----------|--------|
-| **Finesse** | III | Reduces the chance a pick breaks after a wrong pin (counters Sturdy). Never affects Complexity. Incompatible with Last Catch |
+| **Finesse** | III | Reduces the durability a wrong pin costs (counters Sturdy). Never affects Complexity. Incompatible with Last Catch |
 | **Attunement** | II | Increases effective pick strength against complex locks (counters Complexity), letting a lower-tier pick cross a threshold |
 | **Grounded** | III | Reduces damage taken from Shocking locks while holding the pick, in either hand (counters Shocking) |
 | **Quiet Hand** | I | Reduces the sound of failed pin attempts |
-| **Last Catch** | I | ~20% chance to prevent a pick from breaking. Incompatible with Finesse |
+| **Last Catch** | I | ~20% chance that a wrong pin costs no durability at all. Incompatible with Finesse |
 
 Lock picks are enchantable at the enchanting table (see the `enchantment_value` field below). Each enchantment can be individually enabled — and its effect tuned — in the server config.
 
@@ -146,6 +160,7 @@ On first launch, the mod creates these directories with a `_example.json.disable
   "length": 7,
   "enchantment_value": 14,
   "resistance": 12,
+  "pick_wear": 3,
   "fire_resistant": false
 }
 ```
@@ -155,6 +170,7 @@ On first launch, the mod creates these directories with a `_example.json.disable
 | `length` | Number of pins in the lock picking minigame |
 | `enchantment_value` | Enchantability (higher = better enchantments) |
 | `resistance` | Damage resistance of the lock |
+| `pick_wear` | Lock pick durability a wrong pin costs on this lock, 1–1000 (optional, default 1) |
 | `fire_resistant` | Whether the item survives in lava/fire (optional, default false) |
 
 **Lock pick definition schema:**
@@ -162,14 +178,16 @@ On first launch, the mod creates these directories with a `_example.json.disable
 {
   "strength": 0.35,
   "enchantment_value": 10,
+  "durability": 96,
   "fire_resistant": false
 }
 ```
 
 | Field | Description |
 |-------|-------------|
-| `strength` | Pick effectiveness (0.0–1.0, higher = stronger) |
+| `strength` | Which locks the pick may attempt — the Complexity gate (0.0–10.0, higher = stronger). Does **not** affect how fast it wears out |
 | `enchantment_value` | Enchantability at the enchanting table (higher = better enchantments; optional, default 0 = not table-enchantable) |
+| `durability` | How many durability points the pick has before it breaks, 0–10000 (optional, default 64). **0 registers an unbreakable pick** that never wears down |
 | `fire_resistant` | Whether the item survives in lava/fire (optional, default false) |
 
 **Important:** Custom items added via config also need:
@@ -206,6 +224,8 @@ Only fields present in the override are changed; omitted fields keep their defau
 }
 ```
 
+A lock's `pick_wear` **can** be overridden this way, because it is read fresh on every wrong pin. A lock pick's `durability` **cannot** — it is baked into the item when it is registered at startup, long before any datapack loads, so a `durability` key here is ignored with a warning in the log. Set pick durability in `config/locks/lockpick_types/<name>.json` instead, which is read before registration.
+
 > **Note:** Stat overrides cannot create new items — they can only modify items that were already registered at startup. Existing items in the world that have already had their stats baked into NBT (e.g., a lock whose length was written on first placement) will retain their original values.
 
 ## Configuration
@@ -216,7 +236,7 @@ Only fields present in the override are changed; omitted fields keep their defau
 - **Generated Locks & Generated Lock Chances** -- Which locks generate and their relative weights (used when Loot-Scaled Locks is disabled)
 - **Randomize Loaded Locks** -- Whether to randomize lock combinations when loading them from structure files
 - **Loot-Scaled Locks** -- When enabled (default), lock tier is chosen from a chest's loot value instead of random weights. Configurable item value formula with rarity multipliers, enchantment bonuses, per-tier value thresholds (**Loot Value Tiers**), sub-linear stack count scaling, and per-item value overrides. Chests below the lowest tier threshold receive **no lock**
-- **Lock Stats & Lockpick Stats** -- Override built-in lock and lock pick stats without datapacks (set any value to -1 to keep the JSON default)
+- **Lock Stats & Lockpick Stats** -- Override built-in lock and lock pick stats without datapacks (set any value to -1 to keep the JSON default). Includes each lock's **Pick Wear**, the durability a wrong pin costs a lock pick. Pick durability is not here — it is fixed at registration; set it in `config/locks/lockpick_types/`
 
 ### Client Config (`locks-client.toml`)
 - **Deaf Mode** -- Enables visual feedback for the lock picking mechanic
@@ -244,7 +264,7 @@ The Shocking enchantment punishes thieves. **By default, Shocking deals 1.5 dama
 | `Shocking Max Damage` | 1024.0 | Upper clamp (effectively uncapped) |
 | `Shocking Requires Enchantment` | true | If false, *every* lock shocks (as level 1 when unenchanted) |
 | `Shocking Cooldown Ticks` | 0 | Min ticks between shocks to the same player (0 = none). Raise to ~20 when enabling the triggers below |
-| `Shocking Triggers On Pick Break` | true | The original behavior: shock when a lock pick breaks |
+| `Shocking Triggers On Pick Break` | true | The original behavior: shock when a lock pick breaks. Since 1.7.3 a pick breaks only when its durability runs out, so this fires far less often |
 | `Shocking Triggers On Wrong Pin` | false | Shock on each wrong pin during picking |
 | `Shocking Triggers On Unauthorized Interaction` | false | Shock when interacting with a locked block without a key |
 | `Shocking Triggers On Block Break Attempt` | false | Shock when trying to break a protected locked block |
@@ -294,7 +314,7 @@ cd "Locks Reforged"
 # Build the mod JAR
 JAVA_HOME="/path/to/jdk-17" ./gradlew build
 
-# Output: build/libs/locks_reforged-1.7.2.jar
+# Output: build/libs/locks_reforged-1.7.3.jar
 
 # Run the development client
 JAVA_HOME="/path/to/jdk-17" ./gradlew runClient
@@ -303,7 +323,7 @@ JAVA_HOME="/path/to/jdk-17" ./gradlew runClient
 ## Installation
 
 1. Install [Minecraft Forge 1.20.1](https://files.minecraftforge.net/net/minecraftforge/forge/index_1.20.1.html) (47.2.0 or later)
-2. Download `locks_reforged-1.7.2.jar` from the releases
+2. Download `locks_reforged-1.7.3.jar` from the releases
 3. Place the JAR in your `.minecraft/mods/` folder
 4. Launch Minecraft with the Forge profile
 

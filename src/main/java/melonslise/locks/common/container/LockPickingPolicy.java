@@ -55,15 +55,15 @@ public final class LockPickingPolicy
 	}
 
 	/**
-	 * Whether the physical break roll should run at all. Never in ITEMLESS: there is no item to break,
-	 * so no durability, no replacement-pick search, and no break event.
+	 * Whether a wrong pin should cost the held pick durability at all. Never in ITEMLESS: there is no
+	 * item to wear down, so no durability, no replacement-pick search, and no break event.
 	 */
-	public static boolean shouldRollPickBreak(LockPickingMode mode, boolean correct)
+	public static boolean shouldWearPick(LockPickingMode mode, boolean correct)
 	{
 		return !correct && mode == LockPickingMode.ITEM_BACKED;
 	}
 
-	/** Callers must pass pickBroke == false whenever shouldRollPickBreak said not to roll. */
+	/** Callers must pass pickBroke == false whenever shouldWearPick said not to wear the pick. */
 	public static PinOutcome resolve(LockPickingMode mode, boolean correct, boolean pickBroke)
 	{
 		if(correct)

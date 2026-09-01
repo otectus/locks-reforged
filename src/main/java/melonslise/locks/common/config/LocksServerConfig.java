@@ -55,11 +55,13 @@ public class LocksServerConfig
 	public static final ForgeConfigSpec.BooleanValue ENABLE_LAST_CATCH;
 
 	// Lock pick enchantment tuning
-	public static final ForgeConfigSpec.DoubleValue FINESSE_STRENGTH_PER_LEVEL;
+	public static final ForgeConfigSpec.DoubleValue FINESSE_WEAR_REDUCTION_PER_LEVEL;
 	public static final ForgeConfigSpec.DoubleValue ATTUNEMENT_STRENGTH_PER_LEVEL;
 	public static final ForgeConfigSpec.DoubleValue GROUNDED_REDUCTION_PER_LEVEL;
 	public static final ForgeConfigSpec.DoubleValue LAST_CATCH_SAVE_CHANCE;
 	public static final ForgeConfigSpec.DoubleValue QUIET_HAND_VOLUME;
+	public static final ForgeConfigSpec.DoubleValue STURDY_WEAR_PER_LEVEL;
+	public static final ForgeConfigSpec.DoubleValue NEAR_MISS_WEAR_MULTIPLIER;
 
 	// Shocking enchantment tuning
 	public static final ForgeConfigSpec.DoubleValue SHOCKING_DAMAGE_BASE;
@@ -157,7 +159,7 @@ public class LocksServerConfig
 			.comment("Damages the player when a lock pick breaks")
 			.define("Enable Shocking", true);
 		ENABLE_STURDY = cfg
-			.comment("Makes locks harder to pick by reducing effective lock pick strength")
+			.comment("Makes locks harder to pick by wearing lock picks down faster")
 			.define("Enable Sturdy", true);
 		ENABLE_COMPLEXITY = cfg
 			.comment("Restricts which lock picks can open the lock")
@@ -176,7 +178,7 @@ public class LocksServerConfig
 			.define("Enable Awareness", true);
 
 		ENABLE_FINESSE = cfg
-			.comment("Finesse: reduces the chance that lock picks break after a wrong pin.")
+			.comment("Finesse: reduces the durability a wrong pin costs the lock pick.")
 			.define("Enable Finesse", true);
 		ENABLE_ATTUNEMENT = cfg
 			.comment("Attunement: increases effective lock pick strength against complex locks.")
@@ -188,22 +190,33 @@ public class LocksServerConfig
 			.comment("Quiet Hand: reduces the sound of failed pin attempts.")
 			.define("Enable Quiet Hand", true);
 		ENABLE_LAST_CATCH = cfg
-			.comment("Last Catch: occasionally prevents a lock pick from breaking.")
+			.comment("Last Catch: occasionally spares a lock pick the durability cost of a wrong pin.")
 			.define("Enable Last Catch", true);
 
-		cfg.comment("Tuning for the lock pick enchantments. Each value scales its enchantment's effect;",
-				"setting an enchantment's Enable toggle above to false disables it entirely regardless of these.").push("Lock Pick");
-		FINESSE_STRENGTH_PER_LEVEL = cfg
-			.comment("Effective pick-strength bonus per Finesse level, applied only to the break roll (higher = fewer breaks). Default 0.15 = +15%/level.")
-			.defineInRange("Finesse Strength Per Level", 0.15d, 0.0d, 5.0d);
+		cfg.comment("Tuning for the lock picking durability model and the enchantments that bend it.",
+				"A wrong pin costs the held pick a fixed amount of durability decided by the LOCK being picked",
+				"(its 'Pick Wear' in the common config, or 'pick_wear' in its JSON definition). The pick breaks",
+				"only when its own durability pool runs out - there is no random break chance.",
+				"Setting an enchantment's Enable toggle above to false disables it entirely regardless of these.").push("Lock Pick");
+		FINESSE_WEAR_REDUCTION_PER_LEVEL = cfg
+			.comment("Fraction of the durability cost removed per Finesse level. Default 0.15 = -15%/level.",
+				"A wrong pin always costs at least 1 durability, so Finesse can never make picking free.")
+			.defineInRange("Finesse Wear Reduction Per Level", 0.15d, 0.0d, 1.0d);
 		ATTUNEMENT_STRENGTH_PER_LEVEL = cfg
 			.comment("Effective pick-strength bonus per Attunement level, applied only when checking whether a pick can open a Complex lock. Default 0.10/level.")
 			.defineInRange("Attunement Strength Per Level", 0.10d, 0.0d, 5.0d);
+		STURDY_WEAR_PER_LEVEL = cfg
+			.comment("Extra durability cost per Sturdy level on the lock being picked. Default 0.5 = +50%/level.")
+			.defineInRange("Sturdy Wear Per Level", 0.5d, 0.0d, 10.0d);
+		NEAR_MISS_WEAR_MULTIPLIER = cfg
+			.comment("Durability cost multiplier when the guessed pin is off by exactly one, never rounding below 1.",
+				"Default 0.33 = a near miss costs about a third of a far miss.")
+			.defineInRange("Near Miss Wear Multiplier", 0.33d, 0.0d, 1.0d);
 		GROUNDED_REDUCTION_PER_LEVEL = cfg
 			.comment("Fraction of Shocking damage removed per Grounded level while holding the pick. Default 0.20 = -20%/level (level 3 = -60%).")
 			.defineInRange("Grounded Reduction Per Level", 0.20d, 0.0d, 1.0d);
 		LAST_CATCH_SAVE_CHANCE = cfg
-			.comment("Chance for Last Catch to cancel a break that would otherwise occur. Default 0.20 = 20%.")
+			.comment("Chance for Last Catch to cancel the durability cost of a wrong pin entirely. Default 0.20 = 20%.")
 			.defineInRange("Last Catch Save Chance", 0.20d, 0.0d, 1.0d);
 		QUIET_HAND_VOLUME = cfg
 			.comment("Volume of the wrong-pin sound while holding a Quiet Hand pick (normal is 1.0). Default 0.25.")
@@ -231,7 +244,9 @@ public class LocksServerConfig
 				"Raise this (e.g. to 20) when enabling the interaction or wrong-pin triggers below to avoid shock spam.")
 			.defineInRange("Shocking Cooldown Ticks", 0, 0, 72000);
 		SHOCKING_ON_PICK_BREAK = cfg
-			.comment("Shock the player when their lock pick breaks while picking. This is the original Shocking behavior.")
+			.comment("Shock the player when their lock pick breaks while picking. This is the original Shocking behavior.",
+				"Since 1.7.3 a pick only breaks when its durability runs out, so this fires far less often than it",
+				"used to. Enable the wrong-pin trigger below to punish every failed attempt instead.")
 			.define("Shocking Triggers On Pick Break", true);
 		SHOCKING_ON_WRONG_PIN = cfg
 			.comment("Shock the player each time they set a wrong pin while picking, even if the pick does not break.")

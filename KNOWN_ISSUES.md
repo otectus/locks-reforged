@@ -4,6 +4,73 @@
 
 1. **Refmap warning in dev**: The mixin refmap (`locks.refmap.json`) shows "could not be read" in the dev environment. This is a known MixinGradle/ForgeGradle cosmetic issue — dev uses official (Mojang) names which match source annotations directly, so no remapping is needed. The refmap IS correctly included in the production JAR. No fix required.
 
+## Lock Pick Durability (new in 1.7.3)
+
+Lock picks are damageable items with a per-tier durability pool, and a wrong pin spends a fixed amount of
+that pool decided by the **lock** being picked (`pick_wear`). A pick breaks only when the pool reaches
+zero. This replaced the 1.7.2 roll in `LockPickingContainer#tryBreakPick`, where a losing
+`random.nextFloat()` deleted the whole item — a wood pick (strength 0.2) died to 80% of far misses.
+
+**Where the numbers live:** `pick_wear` on `LockStats` and `durability` on `LockPickStats`, both in
+`common/init/LockTypeRegistry`, both flowing through the existing JAR JSON to config-folder JSON to TOML
+to datapack override pipeline. The arithmetic is in `common/container/LockPickWearPolicy#wearFor`, a pure
+static covered by 10 unit tests.
+
+**Durability is fixed at registration and nothing later can move it.** `Item.Properties.durability(n)` is
+read when `LocksItems.register()` builds the properties, which happens during mod construction — before
+the TOML config is loaded and long before any datapack. So a `durability` key in a datapack
+`lockpick_stat_overrides` file is ignored (with a warning), and there is deliberately no
+`Lockpick Durability` TOML entry to match the `Lockpick Strength` ones. `config/locks/lockpick_types/`
+*is* read before registration and does work. A lock's `pick_wear`, by contrast, is read fresh on every
+wrong pin, so both the TOML entry and the datapack override work normally.
+
+**"Did it break?" is read, never predicted.** `wearPick` applies the damage and then checks
+`pickStack.isEmpty()`. Predicting the break from `damage + wear >= maxDamage` looks equivalent and is not:
+`ItemStack#hurt` lets Unbreaking silently swallow part or all of the damage, and `hurtAndBreak` is a no-op
+in creative. A prediction would report `PinOutcome.PICK_BROKE` — resetting pin progress and firing
+Shocking — for a pick that is still in the player's hand.
+
+**No protocol bump.** `TryPinResultPacket` carries `(correct, reset)`. A worn-but-alive pick is
+`WRONG_CONTINUE`, which already sends `reset=false`, so the client leaves the pick sprite intact; only a
+real break sends `reset=true` and plays the snap animation. `PROTOCOL_VERSION` stays `3`.
+
+**`stacksTo(1)` fallout, and what was checked.** `durability(n)` forces a max stack size of 1.
+- Recipes: the copper/gold/iron/steel/diamond pick recipes yielded 2 and now yield 1. A shaped recipe
+  result above the item's max stack size hands an oversized stack out of the result slot.
+- Trades: villager and wandering-trader pick trades sold `numberOfItems = 2` and now sell 1.
+- Loot tables were deliberately **not** changed. Vanilla's loot stack-splitter
+  (`LootTable#createStackSplitter`) already splits an over-max stack into separate stacks, so the
+  `set_count` 2–4 entries yield several single picks. This is the one piece of the fallout that is
+  reasoned rather than mechanically enforced — it is item 10 in the QA script below.
+
+**Deliberate behaviour changes:** a third-party item in the `locks:lock_picks` tag that is not damageable
+is now unbreakable rather than consumed, and a definition with `"durability": 0` registers an unbreakable,
+still-stackable pick on purpose. `strength` no longer influences breakage, only the Complexity gate.
+
+**Verified:** 10 new pure-logic tests (71 in the suite overall), `compileJava`, `compileTestJava` and
+`test` all clean. Everything in-game is manual and is listed in the 1.7.3 script below.
+
+## 1.7.3 Manual QA Script (NOT YET RUN)
+
+Durability, wear rates, trades, recipes and loot all need a live client — none of it is reachable from
+the unit tests, which may not touch `ItemStack`, config values, tags or `Level`.
+
+- [ ] Every lock pick tier shows a durability bar in the inventory, and F3+H reports the value from its JSON (wood 32 … netherite 768).
+- [ ] Miss one pin on a wood lock and on an iron lock with the same iron pick: the iron lock costs 3× the durability.
+- [ ] A fresh wood pick survives exactly 32 far misses on a wood lock and breaks on the 33rd. Run this twice — the whole point of the release is that it is the same number every time.
+- [ ] On the breaking miss: the pick-snap animation plays, pin progress resets, and a replacement pick from the inventory is pulled into the hand.
+- [ ] On a non-breaking miss: the pick sprite stays intact, `pin.fail` plays, and solved pins are **not** reset.
+- [ ] A guess off by exactly one pin costs about a third of a far miss, and never zero (check on a wood lock, where 1 × 0.33 must still cost 1).
+- [ ] Finesse III visibly reduces wear; Sturdy III on the lock visibly raises it; Last Catch occasionally costs nothing; Shocking fires only on the actual break.
+- [ ] Mending repairs a worn pick; Unbreaking III applied at an anvil makes a pick last measurably longer.
+- [ ] With `Netherite Lockpick Unbreakable = true`, a netherite pick takes no wear at all.
+- [ ] Craft each pick (yields 1), buy each villager and wandering-trader pick trade (yields 1), and open a dungeon chest whose pool rolls 2–4 picks — they must arrive as separate single stacks with none lost.
+- [ ] Itemless picking is untouched: with `Allow Itemless Lock Picking = true`, an empty-handed miss still resets progress and spends no durability anywhere.
+- [ ] Set `Pick Wear` for wood locks in `locks-common.toml`, and `pick_wear` in a datapack `lock_stat_overrides` file; `/reload` and confirm both take effect.
+- [ ] Set `durability` in `config/locks/lockpick_types/wood_lock_pick.json`, restart, and confirm the item's max damage changed. Then put `durability` in a datapack `lockpick_stat_overrides` file and confirm it is ignored with a warning in the log.
+- [ ] Load a 1.7.2 save holding a stack of 5 wood picks: no crash, and the stack clamps to single items as they are moved.
+- [ ] A lock placed before 1.7.3 wears picks at its tier's rate (the lock's stored ItemStack still identifies its tier).
+
 ## Awareness Owner Lockout (fixed in 1.7.2)
 
 An Awareness lock used to make its block permanently unusable for the player who placed it: the LOCKED interaction path denies and cancels the click unconditionally before any authorization branch runs, and the UNLOCKED path's Awareness branch checked only the lock's enchantment and owner UUID — not the held item, not aim, not sneaking — so it fired on every click and re-locked immediately. The chest GUI could never open, and because that branch set `relocked` it also returned before the lock-removal branch, so the lock could not be taken off.

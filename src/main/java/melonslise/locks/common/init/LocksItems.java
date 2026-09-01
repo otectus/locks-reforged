@@ -64,10 +64,13 @@ public final class LocksItems
 		// Register data-driven lockpicks
 		for (var entry : LockTypeRegistry.allLockPickDefinitions().entrySet())
 		{
-			boolean fireRes = entry.getValue().fireResistant();
-			Item.Properties properties = fireRes ? new Item.Properties().fireResistant() : new Item.Properties();
-			if (LockPickItem.NETHERITE_LOCK_PICK_ID.equals(entry.getKey()))
-				properties = properties.durability(LockPickItem.NETHERITE_DURABILITY);
+			var pickStats = entry.getValue();
+			Item.Properties properties = pickStats.fireResistant() ? new Item.Properties().fireResistant() : new Item.Properties();
+			// Durability is what makes a pick break, so it has to be baked in here rather than read at use
+			// time. A definition asking for 0 wants an unbreakable pick: leave the item undamageable, since
+			// durability(0) would instead make the very first wrong pin destroy it.
+			if (pickStats.durability() > LockTypeRegistry.UNBREAKABLE_DURABILITY)
+				properties = properties.durability(pickStats.durability());
 			Item.Properties finalProperties = properties;
 			RegistryObject<Item> obj = ITEMS.register(entry.getKey().getPath(), () -> new LockPickItem(finalProperties));
 			LOCKPICK_ITEMS.put(entry.getKey(), obj);

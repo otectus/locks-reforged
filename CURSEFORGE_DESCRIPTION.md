@@ -13,20 +13,22 @@ Attach locks to **any block** — not just chests. Doors, trapdoors, furnaces, d
 
 ### Seven Tiers of Locks (+ Custom!)
 
-| Tier | Pins | Enchantability | Resistance | Pick Strength |
-|------|------|----------------|------------|---------------|
-| Wood | 5 | 15 | 4 | 0.20 |
-| Copper | 6 | 16 | 8 | 0.28 |
-| Iron | 7 | 14 | 12 | 0.35 |
-| Gold | 6 | 22 | 6 | 0.25 |
-| Steel | 9 | 12 | 20 | 0.70 |
-| Diamond | 11 | 10 | 100 | 0.85 |
-| Netherite | 14 | 8 | 200 | 0.95 |
+| Tier | Pins | Enchantability | Resistance | Pick Wear | Pick Strength | Pick Durability |
+|------|------|----------------|------------|-----------|---------------|-----------------|
+| Wood | 5 | 15 | 4 | 1 | 0.20 | 32 |
+| Copper | 6 | 16 | 8 | 2 | 0.28 | 48 |
+| Iron | 7 | 14 | 12 | 3 | 0.35 | 96 |
+| Gold | 6 | 22 | 6 | 2 | 0.25 | 40 |
+| Steel | 9 | 12 | 20 | 6 | 0.70 | 192 |
+| Diamond | 11 | 10 | 100 | 12 | 0.85 | 384 |
+| Netherite | 14 | 8 | 200 | 24 | 0.95 | 768 |
 
 - **Pins** — Number of pins in the lock picking minigame. More pins = harder to pick.
 - **Enchantability** — How likely the lock is to receive powerful enchantments.
 - **Resistance** — Explosion resistance. Diamond and Netherite locks are virtually indestructible.
-- **Pick Strength** — How effective the matching lock pick is. Higher = better.
+- **Pick Wear** — Durability this lock takes off a lock pick on every wrong pin. Higher = eats picks faster.
+- **Pick Strength** — Which locks the matching pick may attempt at all. Higher = better.
+- **Pick Durability** — How many durability points the matching pick has before it breaks.
 
 Netherite items are **fire-resistant** and survive in lava, just like vanilla netherite gear. They're crafted at a smithing table using a Netherite Upgrade Template.
 
@@ -34,6 +36,8 @@ All locks and lock picks are **fully data-driven** — add your own custom tiers
 
 ### Lock Picking Minigame
 Pick locks with an interactive pin-matching minigame. Match each pin to crack the combination. Higher-tier picks are more effective against tougher locks.
+
+**New in 1.7.3 — lock picks use durability.** A wrong pin no longer rolls the dice on destroying your pick outright. It costs a fixed amount of durability instead, set by the lock you are picking, and the pick breaks only once that durability hits zero. You can watch the bar and know exactly how many mistakes you have left. Roughly **32 mistakes against a lock of your pick's own tier**; bring a wood pick to a netherite lock and one wrong pin ends it. Near misses (off by one pin) cost about a third as much. Picks are proper tools now, so Mending and Unbreaking work on them.
 
 **Lock Picks:** Wood, Bobby Pin (copper), Iron, Steel, Gold, Diamond, Netherite (+ custom)
 
@@ -59,7 +63,7 @@ Carry a **Key Ring** to hold many keys at once — it opens any lock whose key i
 
 **Lock enchantments** — go on the lock:
 - **Shocking** — Zaps players who fail a pick attempt (bypasses armor)
-- **Sturdy** — Reduces pick effectiveness
+- **Sturdy** — Makes every wrong pin cost the pick more durability
 - **Complexity** — Blocks lower-tier picks entirely
 - **Silent** — Suppresses the rattle sound when access is denied
 - **Auto-Pick** — Chance to instantly open the lock, bypassing the minigame
@@ -67,11 +71,11 @@ Carry a **Key Ring** to hold many keys at once — it opens any lock whose key i
 - **Awareness** — The lock does not apply to whoever placed it: the block opens for them normally while staying locked to everyone else. Sneak + right-click with an empty hand to unlock it
 
 **Lock pick enchantments** — go on the pick, and provide counterplay (new in 1.7.0):
-- **Finesse** — Reduces the chance a pick breaks after a wrong pin (counters Sturdy)
+- **Finesse** — Reduces the durability a wrong pin costs (counters Sturdy)
 - **Attunement** — Boosts effective pick strength against complex locks (counters Complexity)
 - **Grounded** — Reduces damage from Shocking locks while holding the pick (counters Shocking)
 - **Quiet Hand** — Reduces the sound of failed pin attempts
-- **Last Catch** — Occasionally prevents a pick from breaking (incompatible with Finesse)
+- **Last Catch** — Occasionally makes a wrong pin cost no durability at all (incompatible with Finesse)
 
 Lock picks are now enchantable at the enchanting table. Each enchantment can be individually enabled — and the lock pick enchantments' effects tuned — in the server config.
 
@@ -119,22 +123,26 @@ Drop a JSON file into the config folder to register a brand new lock or lock pic
 {
   "length": 7,
   "enchantment_value": 14,
-  "resistance": 12
+  "resistance": 12,
+  "pick_wear": 3
 }
 ```
 - `length` — Number of pins (1-20)
 - `enchantment_value` — Enchantability (1-50)
 - `resistance` — Explosion resistance (0-1000)
+- `pick_wear` — Lock pick durability a wrong pin costs on this lock (1-1000, optional, default 1)
 
 **To add a custom lock pick**, create `config/locks/lockpick_types/<name>.json`:
 ```json
 {
   "strength": 0.5,
-  "enchantment_value": 10
+  "enchantment_value": 10,
+  "durability": 96
 }
 ```
-- `strength` — Pick effectiveness (0.01-10.0)
+- `strength` — Which locks the pick may attempt, the Complexity gate (0.01-10.0). Does not affect wear
 - `enchantment_value` — Enchantability at the enchanting table (higher = better enchantments; optional, default 0 = not enchantable)
+- `durability` — Durability points before the pick breaks (0-10000, optional, default 64). 0 makes it unbreakable
 
 The filename becomes the item's registry name under the `locks:` namespace (e.g., `netherite_lock.json` registers as `locks:netherite_lock`). Config-folder items override JAR-bundled items of the same name, so you can also use this to replace built-in stats.
 
@@ -169,7 +177,7 @@ Only the fields you list are changed — omitted fields keep their current value
 
 ### Method 3: TOML Config (Override Stats Without Datapacks)
 
-Every built-in lock and lock pick has TOML config entries in `locks-common.toml` that let you override individual stats without needing a datapack. Set any value to `-1` (or `-1.0` for pick strength) to use the JSON default.
+Every built-in lock and lock pick has TOML config entries in `locks-common.toml` that let you override individual stats without needing a datapack. Set any value to `-1` (or `-1.0` for pick strength) to use the JSON default. Each lock also has a `Pick Wear` entry. Pick **durability** is the one stat that cannot be set here or by datapack — it is fixed when the item is registered at startup, so set it in `config/locks/lockpick_types/<name>.json`.
 
 ```toml
 # Example: make the copper lock have 8 pins instead of 6

@@ -28,7 +28,6 @@ public class LockPickItem extends Item
 {
 	public static final Component TOO_COMPLEX_MESSAGE = Component.translatable(Locks.ID + ".status.too_complex");
 	public static final ResourceLocation NETHERITE_LOCK_PICK_ID = new ResourceLocation(Locks.ID, "netherite_lock_pick");
-	public static final int NETHERITE_DURABILITY = 128;
 
 	public LockPickItem(Properties props)
 	{
@@ -37,18 +36,23 @@ public class LockPickItem extends Item
 
 	public static final String KEY_STRENGTH = "Strength";
 
-	// WARNING: EXPECTS LOCKPICKITEM STACK
-	public static float getOrSetStrength(ItemStack stack)
+	// Read-only, unlike the 1.7.2 getOrSetStrength it replaces. That one wrote NBT on every read, so a
+	// pick that had merely been looked at stopped stacking with a fresh one, and every caller had to
+	// guarantee it never saw an empty stack (whose tag is a shared singleton). The registry is the source
+	// of truth; a legacy Strength tag is still honoured so picks saved before 1.7.3 keep their value.
+	public static float getStrength(ItemStack stack)
 	{
-		CompoundTag nbt = stack.getOrCreateTag();
-		if(!nbt.contains(KEY_STRENGTH))
-			nbt.putFloat(KEY_STRENGTH, LockTypeRegistry.getLockPickStats(stack.getItem()).strength());
-		return nbt.getFloat(KEY_STRENGTH);
+		if(stack.isEmpty())
+			return 0f;
+		CompoundTag nbt = stack.getTag();
+		if(nbt != null && nbt.contains(KEY_STRENGTH))
+			return nbt.getFloat(KEY_STRENGTH);
+		return LockTypeRegistry.getLockPickStats(stack.getItem()).strength();
 	}
 
 	public static boolean canPick(ItemStack stack, int cmp)
 	{
-		float strength = getOrSetStrength(stack);
+		float strength = getStrength(stack);
 		if(LocksServerConfig.ENABLE_ATTUNEMENT.get())
 			strength += EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.ATTUNEMENT.get(), stack)
 				* (float) (double) LocksServerConfig.ATTUNEMENT_STRENGTH_PER_LEVEL.get();
@@ -61,14 +65,16 @@ public class LockPickItem extends Item
 			? EnchantmentHelper.getItemEnchantmentLevel(LocksEnchantments.COMPLEXITY.get(), lkb.stack) : 0);
 	}
 
+	// Every pick tier carries durability as of 1.7.3, so this is no longer netherite-only. A definition
+	// that sets durability to 0 registers a pick with no pool at all, which simply never wears down.
 	public static boolean usesDurability(ItemStack stack)
 	{
-		return stack.isDamageableItem() && isNetheriteLockPick(stack);
+		return stack.isDamageableItem();
 	}
 
-	public static void damagePick(ItemStack stack, Player player, InteractionHand hand)
+	public static void damagePick(ItemStack stack, Player player, InteractionHand hand, int amount)
 	{
-		stack.hurtAndBreak(1, player, broken -> broken.broadcastBreakEvent(hand));
+		stack.hurtAndBreak(amount, player, broken -> broken.broadcastBreakEvent(hand));
 	}
 
 	public static boolean isNetheriteLockPick(ItemStack stack)
@@ -106,11 +112,6 @@ public class LockPickItem extends Item
 	public void appendHoverText(ItemStack stack, Level world, List<Component> lines, TooltipFlag flag)
 	{
 		super.appendHoverText(stack, world, lines, flag);
-		float displayStrength;
-		if (stack.hasTag() && stack.getTag().contains(KEY_STRENGTH))
-			displayStrength = stack.getTag().getFloat(KEY_STRENGTH);
-		else
-			displayStrength = LockTypeRegistry.getLockPickStats(this).strength();
-		lines.add(Component.translatable(Locks.ID + ".tooltip.strength", ItemStack.ATTRIBUTE_MODIFIER_FORMAT.format(displayStrength)).withStyle(ChatFormatting.DARK_GREEN));
+		lines.add(Component.translatable(Locks.ID + ".tooltip.strength", ItemStack.ATTRIBUTE_MODIFIER_FORMAT.format(getStrength(stack))).withStyle(ChatFormatting.DARK_GREEN));
 	}
 }

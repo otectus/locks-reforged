@@ -104,12 +104,12 @@ public class LockPickingPolicyTest
 	// --- pin outcomes ---
 
 	@Test
-	void itemlessNeverRollsTheBreakChance()
+	void itemlessNeverSpendsPickDurability()
 	{
-		assertFalse(LockPickingPolicy.shouldRollPickBreak(LockPickingMode.ITEMLESS, false));
-		assertFalse(LockPickingPolicy.shouldRollPickBreak(LockPickingMode.ITEMLESS, true));
-		assertTrue(LockPickingPolicy.shouldRollPickBreak(LockPickingMode.ITEM_BACKED, false));
-		assertFalse(LockPickingPolicy.shouldRollPickBreak(LockPickingMode.ITEM_BACKED, true));
+		assertFalse(LockPickingPolicy.shouldWearPick(LockPickingMode.ITEMLESS, false));
+		assertFalse(LockPickingPolicy.shouldWearPick(LockPickingMode.ITEMLESS, true));
+		assertTrue(LockPickingPolicy.shouldWearPick(LockPickingMode.ITEM_BACKED, false));
+		assertFalse(LockPickingPolicy.shouldWearPick(LockPickingMode.ITEM_BACKED, true));
 	}
 
 	@Test
