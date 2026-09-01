@@ -24,24 +24,26 @@ the TOML config is loaded and long before any datapack. So a `durability` key in
 *is* read before registration and does work. A lock's `pick_wear`, by contrast, is read fresh on every
 wrong pin, so both the TOML entry and the datapack override work normally.
 
-**"Did it break?" is read, never predicted.** `wearPick` applies the damage and then checks
-`pickStack.isEmpty()`. Predicting the break from `damage + wear >= maxDamage` looks equivalent and is not:
-`ItemStack#hurt` lets Unbreaking silently swallow part or all of the damage, and `hurtAndBreak` is a no-op
-in creative. A prediction would report `PinOutcome.PICK_BROKE` — resetting pin progress and firing
-Shocking — for a pick that is still in the player's hand.
+**"Did it break?" is read, never predicted.** `LockPickItem#damagePick` applies wear to one singleton and
+reports the result observed from `hurtAndBreak`. Predicting the break from `damage + wear >= maxDamage`
+looks equivalent and is not: `ItemStack#hurt` lets Unbreaking silently swallow part or all of the damage,
+and `hurtAndBreak` is a no-op in creative. A prediction would report `PinOutcome.PICK_BROKE` — resetting
+pin progress and firing Shocking — for a pick that is still usable.
 
 **No protocol bump.** `TryPinResultPacket` carries `(correct, reset)`. A worn-but-alive pick is
 `WRONG_CONTINUE`, which already sends `reset=false`, so the client leaves the pick sprite intact; only a
 real break sends `reset=true` and plays the snap animation. `PROTOCOL_VERSION` stays `3`.
 
-**`stacksTo(1)` fallout, and what was checked.** `durability(n)` forces a max stack size of 1.
-- Recipes: the copper/gold/iron/steel/diamond pick recipes yielded 2 and now yield 1. A shaped recipe
-  result above the item's max stack size hands an oversized stack out of the result slot.
-- Trades: villager and wandering-trader pick trades sold `numberOfItems = 2` and now sell 1.
-- Loot tables were deliberately **not** changed. Vanilla's loot stack-splitter
-  (`LootTable#createStackSplitter`) already splits an over-max stack into separate stacks, so the
-  `set_count` 2–4 entries yield several single picks. This is the one piece of the fallout that is
-  reasoned rather than mechanically enforced — it is item 10 in the QA script below.
+**Stacking with per-pick durability.** `durability(n)` normally forces a max stack size of 1, but
+`LockPickItem#getMaxStackSize(ItemStack)` restores 64 through Forge's stack-sensitive hook. Pristine picks
+merge normally. When wear actually lands on a multi-pick stack, one singleton becomes the held worn pick
+and the pristine remainder returns to inventory; with a completely full inventory, the remainder is
+dropped rather than deleted. If the active pick breaks, only one count is removed. This split matters
+because damage is stack NBT: leaving a worn multi-item stack intact would duplicate its damage when split.
+Recipes, trades, loot, and existing saves retain their pre-durability counts.
+Anvil book-enchanting is refused on a stack: the anvil never consults `isEnchantable`, and its result
+copies the whole left input, so one book would otherwise enchant all 64 picks. `isBookEnchantable`
+blanks the result slot for any pick stack above one; a single pick enchants, repairs and renames as before.
 
 **Deliberate behaviour changes:** a third-party item in the `locks:lock_picks` tag that is not damageable
 is now unbreakable rather than consumed, and a definition with `"durability": 0` registers an unbreakable,
@@ -64,11 +66,13 @@ the unit tests, which may not touch `ItemStack`, config values, tags or `Level`.
 - [ ] Finesse III visibly reduces wear; Sturdy III on the lock visibly raises it; Last Catch occasionally costs nothing; Shocking fires only on the actual break.
 - [ ] Mending repairs a worn pick; Unbreaking III applied at an anvil makes a pick last measurably longer.
 - [ ] With `Netherite Lockpick Unbreakable = true`, a netherite pick takes no wear at all.
-- [ ] Craft each pick (yields 1), buy each villager and wandering-trader pick trade (yields 1), and open a dungeon chest whose pool rolls 2–4 picks — they must arrive as separate single stacks with none lost.
+- [ ] Craft and trade picks that yield 2, and open a dungeon chest whose pool rolls 2–4 picks — pristine picks must merge into normal stacks.
+- [ ] Miss with a stack of picks: exactly one worn singleton stays in hand and the pristine remainder returns to inventory. Repeat with a full inventory and confirm the remainder drops nearby rather than disappearing.
+- [ ] Put a stack of picks and an enchanted book in an anvil: the result slot stays empty. A single pick still takes the book normally, and repairing or renaming a single pick is unchanged.
 - [ ] Itemless picking is untouched: with `Allow Itemless Lock Picking = true`, an empty-handed miss still resets progress and spends no durability anywhere.
 - [ ] Set `Pick Wear` for wood locks in `locks-common.toml`, and `pick_wear` in a datapack `lock_stat_overrides` file; `/reload` and confirm both take effect.
 - [ ] Set `durability` in `config/locks/lockpick_types/wood_lock_pick.json`, restart, and confirm the item's max damage changed. Then put `durability` in a datapack `lockpick_stat_overrides` file and confirm it is ignored with a warning in the log.
-- [ ] Load a 1.7.2 save holding a stack of 5 wood picks: no crash, and the stack clamps to single items as they are moved.
+- [ ] Load a 1.7.2 save holding a stack of 5 wood picks: it remains a valid stack and takes wear from only one pick.
 - [ ] A lock placed before 1.7.3 wears picks at its tier's rate (the lock's stored ItemStack still identifies its tier).
 
 ## Awareness Owner Lockout (fixed in 1.7.2)

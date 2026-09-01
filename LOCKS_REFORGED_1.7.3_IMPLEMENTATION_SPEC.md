@@ -48,8 +48,8 @@ Everything below was read at the audited revision, not assumed.
 | Last Catch | Second roll after the survive roll already failed (`:213-216`) | Can be remapped to negating a wear tick without reintroducing random *breaking*. |
 | Client animation | `LockPickingScreen#handlePin` infers the snap purely from `reset == true` in `ITEM_BACKED` mode | A worn-but-alive pick is `WRONG_CONTINUE`, which already sends `reset=false`. **No new packet field, no protocol bump.** |
 | `strength` storage | `LockPickItem#getOrSetStrength` (`:41-47`) writes NBT on every read | A pick that had merely been looked at stopped stacking with a fresh one, and `canAttempt`/`tryPin` carry comments warning it must never see an empty stack. |
-| Pick stack sizes | Picks were stackable; 5 of 7 recipes yield `count: 2`; villager and wanderer trades sell `numberOfItems = 2` | `durability(n)` forces `stacksTo(1)`, so recipes and trades must move or they hand out oversized stacks. |
-| Loot | `data/locks/loot_tables/inject/chests/*.json` use `set_count` 2–4 | Vanilla's `LootTable#createStackSplitter` already splits over-max stacks, so these need no edit — but the assumption must be QA'd. |
+| Pick stack sizes | Picks were stackable; 5 of 7 recipes yield `count: 2`; villager and wanderer trades sell `numberOfItems = 2` | `durability(n)` forces the base size to 1, so `LockPickItem` must restore a stack-sensitive maximum while isolating the one pick that carries damage. |
+| Loot | `data/locks/loot_tables/inject/chests/*.json` use `set_count` 2–4 | These remain ordinary pristine stacks; no loot edits are needed. |
 
 ---
 
@@ -114,8 +114,8 @@ Every tuning input is passed through `Math.max(0, …)` so a hand-edited negativ
 - Early-outs: not a lock pick; `NETHERITE_PICK_UNBREAKABLE` on a netherite pick; a pick with no durability pool at all.
 - Last Catch rolls first and, on a save, returns before any damage is applied.
 - `LockPickWearPolicy.wearFor(...)` is fed the lock's `pick_wear` via `LockTypeRegistry.getLockStats(this.lockable.stack.getItem())`, so a lock placed in an older world reports its tier correctly.
-- `LockPickItem.damagePick(pickStack, player, hand, wear)` applies the damage, then `pickStack.isEmpty()` decides the return value. `hurtAndBreak` shrinks the stack on the hit that finishes it and picks stack to 1, so the stack is the exact answer.
-- The replacement-pick scan is preserved verbatim.
+- `LockPickItem.damagePick(pickStack, player, hand, wear)` applies damage to exactly one singleton and returns the observed break result. Unbreaking and creative mode can leave it unchanged. A surviving worn pick becomes the held singleton and the pristine remainder returns to inventory; a broken pick removes only one count.
+- The replacement-pick scan still runs when the final held pick breaks. A nonempty stacked remainder is already its own replacement.
 
 `getBreakChanceMultiplier(int) : float` became `isNearMiss(int) : boolean`. Both were `protected`; this is a deliberate, compile-visible API change for third-party subclasses.
 
@@ -124,7 +124,8 @@ Every tuning input is passed through `Math.max(0, …)` so a hand-edited negativ
 ### 5.4 `LockPickItem` cleanup
 
 - `usesDurability(stack)` is now just `stack.isDamageableItem()`; the netherite hardcode and the `NETHERITE_DURABILITY` constant are gone.
-- `damagePick` takes an `int amount`.
+- `getMaxStackSize(stack)` returns 64 through Forge's stack-sensitive hook, overriding the base size forced by `durability(n)`.
+- `damagePick` takes an `int amount`, isolates one worn pick from a pristine stack, and returns whether that pick actually broke.
 - `getOrSetStrength` became a read-only `getStrength(ItemStack)`: registry first, legacy `Strength` NBT honoured when present, `0f` for an empty stack. This removes the NBT-on-read hazard the container and `canAttempt` were carrying comments about.
 
 ### 5.5 Wear tests
@@ -143,19 +144,22 @@ Every tuning input is passed through `Math.max(0, …)` so a hand-edited negativ
 
 ---
 
-## 6. Workstream B — `stacksTo(1)` fallout
+## 6. Workstream B — stackable durability
 
-`Item.Properties.durability(n)` sets `maxStackSize = 1`. Three consequences, two of which needed edits:
+`Item.Properties.durability(n)` sets the base `maxStackSize = 1`. Forge exposes a stack-sensitive item hook,
+so `LockPickItem#getMaxStackSize(ItemStack)` restores the preexisting maximum of 64 without giving up
+vanilla durability.
 
 | Surface | Status |
 |---|---|
-| Recipes | `copper/diamond/gold/iron/steel_lock_pick.json` yielded `count: 2` → now `1`. A shaped recipe result above the item's max stack size hands an oversized stack out of the result slot. |
-| Trades | Villager pick trades (wood, iron, gold, steel, diamond) and both wandering-trader pick trades sold `numberOfItems = 2` → now `1`, at unchanged emerald cost. |
-| Loot tables | **Unchanged, deliberately.** `LootTable#createStackSplitter` already splits an over-max stack into separate stacks, so the `set_count` 2–4 entries yield several single picks. This is the one piece of the fallout that is reasoned rather than mechanically enforced, and it is an explicit QA item. |
+| Recipes | `copper/diamond/gold/iron/steel_lock_pick.json` retain their original `count: 2` results. |
+| Trades | Villager and wandering-trader pick trades retain their original `numberOfItems = 2` where applicable. |
+| Loot tables | Unchanged. Their `set_count` 2–4 entries now remain normal pristine stacks. |
 
-Note that `LockingItem` already applied `stacksTo(1)`, so locks were never affected — and, usefully, `LockPickItem` extends `Item` directly, so there is no `stacksTo(1)`/`durability(n)` collision to work around (`Properties.stacksTo` throws when `maxDamage > 0`).
-
-Existing worlds may hold a saved stack of several picks. Vanilla tolerates over-max stacks on load and clamps them as they move, so this is documented rather than migrated.
+Damage belongs to stack NBT, so a damaged multi-item stack cannot safely represent "one worn pick": splitting
+it would copy that damage onto both results. `damagePick` therefore works on a singleton copy. If damage
+lands, that singleton becomes the held item and the pristine remainder is placed back into inventory (or
+dropped if full). If the singleton breaks, only one count is removed and the remainder stays in hand.
 
 ---
 
@@ -229,9 +233,11 @@ Automated coverage is 71 unit tests (10 new). Everything below needs a live clie
 - [ ] `Netherite Lockpick Unbreakable = true` → no wear at all.
 - [ ] `Pick Wear` via TOML and via datapack both apply on `/reload`; `durability` via `config/locks/lockpick_types/` applies on restart and via datapack is refused with a log warning.
 
-### 9.4 Stack fallout and migration
-- [ ] Craft (1), trade (1), and loot a chest rolling 2–4 picks (separate single stacks, none lost).
-- [ ] A 1.7.2 save holding a stack of 5 wood picks loads without crashing and clamps as the stack is moved.
+### 9.4 Stacking and migration
+- [ ] Craft, trade, and loot multiple pristine picks; they merge into stacks up to 64.
+- [ ] Miss with a stack: one worn singleton stays held and the pristine remainder returns to inventory (or drops safely when full).
+- [ ] Break a pick from a stack: the count falls by exactly one, the next pristine pick stays held, and the break outcome still resets progress.
+- [ ] A 1.7.2 save holding a stack of 5 wood picks remains stacked and follows the same per-pick wear behavior.
 - [ ] Itemless picking spends no durability anywhere.
 
 ---
@@ -271,7 +277,7 @@ See the `## 1.7.3` section at the top of `CHANGELOG.md`, which carries the user-
 - Every lock pick tier has durability, and no code path destroys a pick for any reason other than that durability reaching zero.
 - The wear a wrong pin costs is decided by the lock, is deterministic, and is never zero.
 - Sturdy, Finesse and Last Catch all still matter, and the only surviving die roll can only save durability.
-- Recipes, trades, loot and existing saves all behave sanely under `stacksTo(1)`.
+- Pristine picks stack to 64, while wear and breakage affect exactly one pick at a time.
 - The 1.7.3 manual QA script has been run and its boxes ticked.
 
 The critical design theme: **replace a hidden probability with a visible number.** The player could never see the old break chance and could not plan around it; a durability bar is a promise the game keeps, and every decision in this release — reading the break off the item instead of predicting it, flooring wear at 1, refusing to fake a durability override that cannot take effect — protects the accuracy of that promise.

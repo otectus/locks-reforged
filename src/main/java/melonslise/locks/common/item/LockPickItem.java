@@ -26,6 +26,7 @@ import net.minecraftforge.registries.ForgeRegistries;
 
 public class LockPickItem extends Item
 {
+	public static final int MAX_STACK_SIZE = 64;
 	public static final Component TOO_COMPLEX_MESSAGE = Component.translatable(Locks.ID + ".status.too_complex");
 	public static final ResourceLocation NETHERITE_LOCK_PICK_ID = new ResourceLocation(Locks.ID, "netherite_lock_pick");
 
@@ -72,9 +73,62 @@ public class LockPickItem extends Item
 		return stack.isDamageableItem();
 	}
 
-	public static void damagePick(ItemStack stack, Player player, InteractionHand hand, int amount)
+	/**
+	 * Damages exactly one pick and reports whether that pick broke.
+	 *
+	 * Damage is stored on an ItemStack, not on an individual item within it. Keeping a damaged multi-item
+	 * stack would therefore make every pick appear damaged and would duplicate that damage if the player
+	 * split the stack. Work on a singleton copy instead. If it survives with new damage, it becomes the held
+	 * pick and the untouched remainder goes back into the inventory. If it breaks, only one item is removed
+	 * from the original stack and the next pristine pick remains ready in the hand.
+	 */
+	public static boolean damagePick(ItemStack stack, Player player, InteractionHand hand, int amount)
 	{
-		stack.hurtAndBreak(amount, player, broken -> broken.broadcastBreakEvent(hand));
+		if(stack.getCount() <= 1)
+		{
+			int countBefore = stack.getCount();
+			stack.hurtAndBreak(amount, player, broken -> broken.broadcastBreakEvent(hand));
+			return stack.getCount() < countBefore;
+		}
+
+		ItemStack wornPick = stack.copy();
+		wornPick.setCount(1);
+		int damageBefore = wornPick.getDamageValue();
+		wornPick.hurtAndBreak(amount, player, broken -> broken.broadcastBreakEvent(hand));
+
+		if(wornPick.isEmpty())
+		{
+			stack.shrink(1);
+			// A multi-item stack represents one active pick followed by pristine picks. Vanilla resets this
+			// after a singleton breaks; do the same for the pristine remainder of our stack.
+			if(!stack.isEmpty())
+				stack.setDamageValue(0);
+			return true;
+		}
+
+		// Creative mode and Unbreaking can prevent all requested damage. Keep the stack together unless
+		// this particular pick actually acquired wear.
+		if(wornPick.getDamageValue() == damageBefore)
+			return false;
+
+		ItemStack pristineRemainder = stack.copy();
+		pristineRemainder.shrink(1);
+		pristineRemainder.setDamageValue(0);
+		player.setItemInHand(hand, wornPick);
+		// This merges with another pristine stack when possible and drops the remainder beside the player
+		// when every inventory slot is full, so splitting can never silently delete picks.
+		player.getInventory().placeItemBackInInventory(pristineRemainder);
+		return false;
+	}
+
+	/**
+	 * Forge's stack-sensitive hook overrides the size forced to one by Properties#durability. A pristine
+	 * damageable stack remains mergeable; vanilla already refuses to merge a worn singleton.
+	 */
+	@Override
+	public int getMaxStackSize(ItemStack stack)
+	{
+		return MAX_STACK_SIZE;
 	}
 
 	public static boolean isNetheriteLockPick(ItemStack stack)
@@ -92,6 +146,16 @@ public class LockPickItem extends Item
 	public boolean isEnchantable(ItemStack stack)
 	{
 		return stack.getCount() == 1 && LocksTagHelper.isLockPick(stack);
+	}
+
+	// The anvil never consults isEnchantable, and its result is a copy of the whole left input, count
+	// included: one enchanted book laid against 64 pristine picks would enchant all 64 for a flat 40
+	// levels. Forge calls this hook at the end of AnvilMenu#createResult, so refusing a stack here blanks
+	// the result slot. A single pick is unaffected.
+	@Override
+	public boolean isBookEnchantable(ItemStack stack, ItemStack book)
+	{
+		return stack.getCount() == 1;
 	}
 
 	@Override

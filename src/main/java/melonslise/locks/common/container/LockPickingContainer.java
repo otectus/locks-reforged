@@ -217,12 +217,14 @@ public class LockPickingContainer extends AbstractContainerMenu
 			LocksServerConfig.STURDY_WEAR_PER_LEVEL.get(),
 			finesse,
 			LocksServerConfig.FINESSE_WEAR_REDUCTION_PER_LEVEL.get());
-		LockPickItem.damagePick(pickStack, player, this.hand, wear);
-		// hurtAndBreak empties the stack on the hit that finishes it, and picks stack to 1, so the stack is
-		// the exact answer to "did it break" — including when Unbreaking silently ate the damage, and when
-		// creative mode ignored it outright. Never predict this; ask the item.
-		if (!pickStack.isEmpty())
+		boolean pickBroke = LockPickItem.damagePick(pickStack, player, this.hand, wear);
+		// damagePick observes hurtAndBreak's actual result, including Unbreaking and creative mode, and only
+		// removes the one active pick from a stack. Never predict a break from damage + wear.
+		if (!pickBroke)
 			return false;
+		// A stacked pick already has its next pristine item ready in the same hand.
+		if (!pickStack.isEmpty())
+			return true;
 		for (int a = 0; a < player.getInventory().getContainerSize(); ++a)
 		{
 			ItemStack stack = player.getInventory().getItem(a);

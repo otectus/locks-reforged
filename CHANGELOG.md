@@ -1,5 +1,26 @@
 # Locks Reforged Changelog
 
+## 1.7.4
+
+### Lock picks stack again, and only one pick in the stack wears down
+
+- **Lock picks stack to 64 once more.** 1.7.3 gave every pick tier real durability, and Minecraft makes a durable item unstackable as a matter of course — so picks silently dropped to a stack size of one, crafting yields halved, and trades halved with them. All of that is undone: fresh picks merge into ordinary stacks again, the copper, gold, iron, steel and diamond recipes are back to **2** per craft, and the villager and wandering-trader pick trades sell 2 again at the same emerald price. Loot tables were never changed and still roll 2–4.
+- **Durability works exactly as it did in 1.7.3, and lands on exactly one pick.** Minecraft stores damage on the stack rather than on the individual items in it, so a damaged stack of 64 would show every pick as worn and hand you 64 damaged picks the moment you split it. Instead, the first wrong pin that actually costs durability splits the stack for you: the single pick you are working with stays in your hand carrying the damage, and the untouched remainder goes straight back into your inventory. Break that pick and only one item leaves the stack — the next pristine pick is already in your hand and the attempt continues as before.
+- **A worn pick will not merge back into a fresh stack.** That is the point rather than an oversight: it is what keeps the lost durability on the one pick that earned it. Repair it at an anvil or with Mending and it stacks normally again.
+- If every inventory slot is full when the split happens, the remainder drops at your feet rather than disappearing.
+- Creative mode and Unbreaking are respected. If a wrong pin ends up costing no durability at all, the stack is left whole instead of being split for nothing.
+- Worlds saved under 1.7.2 or earlier load unchanged, and a stack of picks carried over from them stays a valid stack that wears down one pick at a time.
+
+### Anvils will not enchant a whole stack
+
+- **An enchanted book applied to a stack of picks is now refused.** An anvil copies its left-hand input in full, count and all, so a single book would otherwise have enchanted all 64 picks at once for a flat 40 levels. The result slot now stays empty for any pick stack larger than one. A single pick enchants, repairs and renames exactly as before, and the enchanting table was already limited to single picks.
+
+### Internal
+
+- `LockPickItem#getMaxStackSize(ItemStack)` restores the maximum of 64 through Forge's stack-sensitive item hook, overriding the 1 that `Item.Properties#durability` bakes into the item. Vanilla's own `ItemStack#isStackable` already refuses to merge a damaged stack, and that is what keeps a worn pick separate.
+- The split lives in `LockPickItem#damagePick`, which applies wear to a singleton copy and reports whether that pick broke. `LockPickingContainer#wearPick` now takes the break verdict from that return value instead of inferring it from an empty held stack, which was only correct while picks stacked to one.
+- New `LockPickItem#isBookEnchantable` override, which Forge consults inside `AnvilMenu#createResult`.
+
 ## 1.7.3
 
 ### Lock picks now use durability instead of a random break chance
