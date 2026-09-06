@@ -30,6 +30,12 @@ public final class CarryOnCompat
 {
 	private static boolean carryOnLoaded = false;
 	private static boolean curiosLoaded = false;
+	// Whether the Carry On adapter was actually COMPILED into this build. The mixins under
+	// melonslise.locks.mixin.carryon are excluded from the source set when the Carry On jar is not vendored, so
+	// the mod being installed says nothing about whether this jar can talk to it.
+	private static boolean adapterCompiled = false;
+
+	private static final String ADAPTER_CLASS = "melonslise.locks.mixin.carryon.CarryOnDataMixin";
 
 	// Marks the block position currently being picked up by an authorized Carry On carry, so that
 	// LocksForgeEvents.onBlockBreak (which Carry On triggers as its pickup gate) does not veto it.
@@ -42,8 +48,27 @@ public final class CarryOnCompat
 	{
 		carryOnLoaded = ModList.get().isLoaded("carryon");
 		curiosLoaded = ModList.get().isLoaded("curios");
-		if (carryOnLoaded)
-			Locks.LOGGER.info("Carry On detected — locks will be carried with their blocks");
+		adapterCompiled = classExists(ADAPTER_CLASS);
+		if (adapterCompiled && carryOnLoaded)
+			Locks.LOGGER.info("Carry On detected and the Locks adapter is present — locks will be carried with their blocks");
+		else if (carryOnLoaded)
+			Locks.LOGGER.warn("Carry On is installed but this Locks build was compiled without the Carry On adapter — locks will NOT be carried with their blocks");
+		else if (adapterCompiled)
+			Locks.LOGGER.debug("Carry On adapter compiled in, but Carry On is not installed");
+	}
+
+	private static boolean classExists(String name)
+	{
+		try
+		{
+			// Never initialize: the adapter is a mixin target class and must not be touched beyond its presence.
+			Class.forName(name, false, CarryOnCompat.class.getClassLoader());
+			return true;
+		}
+		catch (Throwable t)
+		{
+			return false;
+		}
 	}
 
 	public static boolean isCarryOnLoaded()
@@ -51,10 +76,16 @@ public final class CarryOnCompat
 		return carryOnLoaded;
 	}
 
-	/** True when Carry On is present and the compatibility master toggle is on. */
+	/** Whether this build actually contains the compiled Carry On adapter. */
+	public static boolean isAdapterCompiled()
+	{
+		return adapterCompiled;
+	}
+
+	/** True when the adapter is compiled in, Carry On is present, and the compatibility master toggle is on. */
 	public static boolean enabled()
 	{
-		return carryOnLoaded && LocksServerConfig.CARRYON_ENABLE.get();
+		return adapterCompiled && carryOnLoaded && LocksServerConfig.CARRYON_ENABLE.get();
 	}
 
 	public static boolean denyPartialMultiBlock()

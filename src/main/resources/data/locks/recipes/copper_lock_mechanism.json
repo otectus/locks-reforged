@@ -1,28 +1,82 @@
 {
-	"type": "minecraft:crafting_shaped",
-	"pattern":
+	"type": "forge:conditional",
+	"recipes":
 	[
-		"SSS",
-		"NNN",
-		"III"
-	],
-	"key":
-	{
-		"S":
 		{
-			"item": "locks:spring"
+			"conditions":
+			[
+				{
+					"type": "forge:not",
+					"value":
+					{
+						"type": "forge:tag_empty",
+						"tag": "forge:nuggets/copper"
+					}
+				}
+			],
+			"recipe":
+			{
+				"type": "minecraft:crafting_shaped",
+				"pattern":
+				[
+					"SSS",
+					"NNN",
+					"III"
+				],
+				"key":
+				{
+					"S":
+					{
+						"item": "locks:spring"
+					},
+					"N":
+					{
+						"tag": "forge:nuggets/copper"
+					},
+					"I":
+					{
+						"tag": "forge:ingots/copper"
+					}
+				},
+				"result":
+				{
+					"item": "locks:copper_lock_mechanism"
+				}
+			}
 		},
-		"N":
 		{
-			"tag": "forge:nuggets/copper"
-		},
-		"I":
-		{
-			"tag": "forge:ingots/copper"
+			"conditions":
+			[
+				{
+					"type": "forge:tag_empty",
+					"tag": "forge:nuggets/copper"
+				}
+			],
+			"recipe":
+			{
+				"type": "minecraft:crafting_shaped",
+				"pattern":
+				[
+					"SSS",
+					" I ",
+					"III"
+				],
+				"key":
+				{
+					"S":
+					{
+						"item": "locks:spring"
+					},
+					"I":
+					{
+						"tag": "forge:ingots/copper"
+					}
+				},
+				"result":
+				{
+					"item": "locks:copper_lock_mechanism"
+				}
+			}
 		}
-	},
-	"result":
-	{
-		"item": "locks:copper_lock_mechanism"
-	}
+	]
 }

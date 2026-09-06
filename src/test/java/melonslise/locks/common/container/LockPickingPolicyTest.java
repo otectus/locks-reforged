@@ -48,14 +48,16 @@ public class LockPickingPolicyTest
 
 	// --- isSessionValid: whether an open session may keep going ---
 
+	// The session-identity half defaults to "still the session we opened" so the pre-existing cases below read
+	// exactly as they did before the two parameters were added.
 	private static boolean itemBacked(boolean lockLocked, boolean spectator, double distSqr, boolean pick)
 	{
-		return LockPickingPolicy.isSessionValid(LockPickingMode.ITEM_BACKED, lockLocked, spectator, distSqr, pick, false, true);
+		return LockPickingPolicy.isSessionValid(LockPickingMode.ITEM_BACKED, lockLocked, spectator, distSqr, pick, false, true, true, true);
 	}
 
 	private static boolean itemless(boolean lockLocked, boolean spectator, double distSqr, boolean handEmpty, boolean allowed)
 	{
-		return LockPickingPolicy.isSessionValid(LockPickingMode.ITEMLESS, lockLocked, spectator, distSqr, false, handEmpty, allowed);
+		return LockPickingPolicy.isSessionValid(LockPickingMode.ITEMLESS, lockLocked, spectator, distSqr, false, handEmpty, allowed, true, true);
 	}
 
 	@Test
@@ -98,7 +100,32 @@ public class LockPickingPolicyTest
 	{
 		// Complexity, pick strength and Attunement all feed the holdingValidPick flag. An itemless session
 		// must be immune to them, or the maximum-Complexity locks would gate loot behind an absent item.
-		assertTrue(LockPickingPolicy.isSessionValid(LockPickingMode.ITEMLESS, true, false, 0d, false, true, true));
+		assertTrue(LockPickingPolicy.isSessionValid(LockPickingMode.ITEMLESS, true, false, 0d, false, true, true, true, true));
+	}
+
+	@Test
+	void bothModesEndInTheWrongDimension()
+	{
+		// A session opened in the overworld must not keep picking a Nether copy of the same record after a portal.
+		assertFalse(LockPickingPolicy.isSessionValid(LockPickingMode.ITEM_BACKED, true, false, 0d, true, false, true, false, true));
+		assertFalse(LockPickingPolicy.isSessionValid(LockPickingMode.ITEMLESS, true, false, 0d, false, true, true, false, true));
+	}
+
+	@Test
+	void bothModesEndWhenTheTargetIsNoLongerCanonical()
+	{
+		// The record the menu was opened against was removed (block broken, chunk unloaded, block carried away)
+		// or replaced under the same id. Mutating what is there now would be mutating a different lock.
+		assertFalse(LockPickingPolicy.isSessionValid(LockPickingMode.ITEM_BACKED, true, false, 0d, true, false, true, true, false));
+		assertFalse(LockPickingPolicy.isSessionValid(LockPickingMode.ITEMLESS, true, false, 0d, false, true, true, true, false));
+	}
+
+	@Test
+	void identityGatesDoNotReviveAnOtherwiseInvalidSession()
+	{
+		// They only ever deny; every other reason to end a session still ends it with both gates satisfied.
+		assertFalse(LockPickingPolicy.isSessionValid(LockPickingMode.ITEM_BACKED, false, false, 0d, true, false, true, true, true));
+		assertFalse(LockPickingPolicy.isSessionValid(LockPickingMode.ITEM_BACKED, true, true, 0d, true, false, true, true, true));
 	}
 
 	// --- pin outcomes ---

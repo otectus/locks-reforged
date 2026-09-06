@@ -1,8 +1,11 @@
 package melonslise.locks.common.compat;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
+import melonslise.locks.Locks;
 import melonslise.locks.common.capability.ILockableHandler;
 import melonslise.locks.common.init.LocksCapabilities;
 import melonslise.locks.common.util.Cuboid6i;
@@ -90,6 +93,7 @@ public final class CarriedLockTransfer
 			return;
 
 		ListTag list = data.getList(KEY_LOCKABLES, Tag.TAG_COMPOUND);
+		Set<Integer> failed = new LinkedHashSet<>();
 		int restored = 0;
 		for (int i = 0; i < list.size(); ++i)
 		{
@@ -103,16 +107,41 @@ public final class CarriedLockTransfer
 			else
 			{
 				// add() rejects on unloaded target chunks, an overlapping lockable, or over-volume.
-				// For a freshly placed single block this should not happen; log so the lock isn't lost silently.
-				CarryOnCompat.log("Failed to restore lockable id={} at {} (handler rejected add)", moved.id, placePos);
+				failed.add(i);
+				Locks.LOGGER.warn("[CarryOn] Failed to restore lockable id={} at {} (handler rejected add); keeping it on the carried block", moved.id, placePos);
 			}
 		}
 
-		data.remove(KEY_LOCKABLES);
-		data.remove(KEY_ORIGIN);
+		// Only the entries that were actually accepted leave the payload. Clearing it unconditionally — as this
+		// did before — permanently destroyed any lockable the handler refused.
+		ListTag retained = retain(list, failed);
+		if (retained.isEmpty())
+		{
+			data.remove(KEY_LOCKABLES);
+			data.remove(KEY_ORIGIN);
+		}
+		else
+		{
+			// The origin stays untouched so a later placement offsets the retained boxes from the same base.
+			data.put(KEY_LOCKABLES, retained);
+			Locks.LOGGER.warn("[CarryOn] Retained {} lockable(s) on the carried block at {} for a later placement", retained.size(), placePos);
+		}
 		be.setChanged();
 
 		CarryOnCompat.log("Restored {} lockable(s) at {}", restored, placePos);
+	}
+
+	/**
+	 * The payload to keep on the block: exactly the entries at {@code failedIndices}, in their original order.
+	 * Pure, so the retention decision is testable without a world.
+	 */
+	public static ListTag retain(ListTag original, Set<Integer> failedIndices)
+	{
+		ListTag retained = new ListTag();
+		for (int i = 0; i < original.size(); ++i)
+			if (failedIndices.contains(i))
+				retained.add(original.get(i));
+		return retained;
 	}
 
 	/** A copy of {@code original} at {@code newBox}, preserving its lock, transform, item and id (a move, not a re-lock). */

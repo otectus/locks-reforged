@@ -39,13 +39,18 @@ public final class LockPickingPolicy
 
 	/**
 	 * Whether an already-open session may keep going. Checked every tick server-side, so moving away,
-	 * dying, going spectator, filling the recorded hand, losing the lock, or an operator turning the
-	 * option off mid-session all end it.
+	 * dying, going spectator, changing dimension, losing the target record, filling the recorded hand,
+	 * losing the lock, or an operator turning the option off mid-session all end it.
 	 */
 	public static boolean isSessionValid(LockPickingMode mode, boolean lockLocked, boolean spectator,
-		double distSqr, boolean holdingValidPick, boolean handEmpty, boolean itemlessAllowed)
+		double distSqr, boolean holdingValidPick, boolean handEmpty, boolean itemlessAllowed,
+		boolean sameDimension, boolean targetStillCanonical)
 	{
-		if(!lockLocked || spectator || distSqr > MAX_REACH_SQR)
+		// sameDimension and targetStillCanonical are the session's identity half: the player must still be in the
+		// dimension the menu was opened in, and the lockable it was opened against must still be the live record
+		// under that id. Without them a session survives a teleport, or keeps mutating a lockable that has since
+		// been removed and replaced.
+		if(!lockLocked || spectator || distSqr > MAX_REACH_SQR || !sameDimension || !targetStillCanonical)
 			return false;
 		return switch(mode)
 		{

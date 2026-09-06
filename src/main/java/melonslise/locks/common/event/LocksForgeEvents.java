@@ -35,6 +35,8 @@ import melonslise.locks.common.item.KeyRingItem;
 import melonslise.locks.common.item.LockItem;
 import melonslise.locks.common.item.LockPickItem;
 import melonslise.locks.common.item.LockingItem;
+import melonslise.locks.common.capability.LocksSavedData;
+import melonslise.locks.common.util.Lock;
 import melonslise.locks.common.util.Lockable;
 import melonslise.locks.common.util.LocksThreadUtil;
 import melonslise.locks.common.util.LocksUtil;
@@ -141,8 +143,29 @@ public final class LocksForgeEvents
 			// generation can allocate ids off-thread (C2ME), keeping ids unique across server restarts.
 			level.getCapability(LocksCapabilities.LOCKABLE_HANDLER).ifPresent(ILockableHandler::initIds);
 			if (level.dimension() == Level.OVERWORLD)
+			{
+				loadComboSalt(level.getServer());
 				LootValueCalculator.precomputeAll(level.getServer());
+			}
 		}
+	}
+
+	// Resolves the lock-combination migration salt into Lock's plain static field, on the main thread, before any
+	// chunk can deserialize a lock. Deliberately read from the OVERWORLD's storage rather than the loading level's:
+	// LocksSavedData is per-dimension, and a per-dimension salt would migrate the same carried lock differently in
+	// each dimension. This must stay on the FORGE bus — on the MOD bus it would never fire, the salt would stay 0,
+	// and every reroll would collapse back to a value the client can derive.
+	private static void loadComboSalt(net.minecraft.server.MinecraftServer server)
+	{
+		if (server == null)
+			return;
+		LocksSavedData data = server.overworld().getDataStorage().computeIfAbsent(LocksSavedData::load, LocksSavedData::new, LocksSavedData.NAME);
+		long salt = data.getOrCreateComboSalt();
+		Lock.setMigrationSalt(salt);
+		if (salt == 0L)
+			Locks.LOGGER.error("Lock combination salt resolved to zero — legacy combinations would migrate to a client-derivable value!");
+		else
+			Locks.LOGGER.info("Loaded the lock combination salt from the overworld save; legacy id-derived combinations will be rerolled once.");
 	}
 
 	@SubscribeEvent

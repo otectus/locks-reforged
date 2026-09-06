@@ -16,7 +16,12 @@ public final class LocksClientModEvents
 	@SubscribeEvent
 	public static void onSetup(FMLClientSetupEvent e)
 	{
-		LocksScreens.register();
-		LocksItemModelsProperties.register();
+		// FMLClientSetupEvent is MOD-bus and parallel-dispatched: neither the screen registry nor the item
+		// property registry is thread-safe, so both registrations are queued onto the main thread.
+		e.enqueueWork(() ->
+		{
+			LocksScreens.register();
+			LocksItemModelsProperties.register();
+		});
 	}
 }

@@ -1,6 +1,7 @@
 package melonslise.locks.mixin;
 
 import java.util.ArrayList;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.List;
 
 import javax.annotation.Nullable;
@@ -64,7 +65,7 @@ public class StructureTemplateMixin
 				if(!lkb.bb.intersects(bb))
 					continue;
 				Cuboid6i newBB = bb.intersection(lkb.bb).offset(-start.getX(), -start.getY(), -start.getZ());
-				this.lockableInfos.add(new LockableInfo(newBB, lkb.lock, lkb.tr, lkb.stack, lkb.id));
+				this.lockableInfos.add(new LockableInfo(newBB, lkb.lock.copy(), lkb.tr, lkb.stack.copy(), lkb.id));
 			}
 		}
 	}
@@ -96,7 +97,13 @@ public class StructureTemplateMixin
 			BlockPos pos2 = LocksUtil.transform(lkb.bb.x2, lkb.bb.y2, lkb.bb.z2, settings);
 			Cuboid6i bb = new Cuboid6i(pos1.getX() + start.getX(), pos1.getY() + start.getY(), pos1.getZ() + start.getZ(), pos2.getX() + start.getX(), pos2.getY() + start.getY(), pos2.getZ() + start.getZ());
 			ItemStack stack = LocksConfig.RANDOMIZE_LOADED_LOCKS.get() ? LocksConfig.getRandomLock(rng) : lkb.stack;
-			Lock lock = LocksConfig.RANDOMIZE_LOADED_LOCKS.get() ? Lock.from(stack) : lkb.lock;
+			// Never hand out the template's own Lock: reusing it would give every placement of this structure —
+			// and the world lock the template was captured from — one shared object and one shared combination.
+			// With randomization off the credential is preserved (existing keys keep working), but the pin order
+			// is drawn fresh for each placement.
+			Lock lock = LocksConfig.RANDOMIZE_LOADED_LOCKS.get()
+				? Lock.from(stack)
+				: Lock.generate(lkb.lock.id, lkb.lock.getLength(), lkb.lock.isLocked(), ThreadLocalRandom.current());
 			Transform tr = Transform.fromDirectionAndFace(settings.getRotation().rotate(settings.getMirror().getRotation(lkb.tr.dir).rotate(lkb.tr.dir)), lkb.tr.face, Direction.NORTH);
 			built.add(new Lockable(bb, lock, tr, stack, level));
 		}

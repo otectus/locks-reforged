@@ -74,6 +74,14 @@ public class LockPickingScreen extends AbstractContainerScreen<LockPickingContai
 
 	protected int currPin;
 
+	// One outstanding request at a time. The sequence identifies it, so a late or duplicated result from an
+	// earlier attempt is discarded instead of animating the wrong pin; the timeout keeps a dropped result from
+	// freezing the minigame forever.
+	protected static final int RESPONSE_TIMEOUT_TICKS = 60;
+	protected int nextSequence = 1;
+	protected int pendingSequence = 0;
+	protected int pendingTicks;
+
 	protected boolean frozen = true;
 
 	public LockPickingScreen(LockPickingContainer cont, Inventory inv, Component title)
@@ -195,6 +203,8 @@ public class LockPickingScreen extends AbstractContainerScreen<LockPickingContai
 			sprite.update();
 		if(!this.frozen)
 			this.boundLockPick();
+		if(this.pendingSequence != 0 && ++this.pendingTicks > RESPONSE_TIMEOUT_TICKS)
+			this.pendingSequence = 0;
 		this.updatePickParts();
 	}
 
@@ -253,13 +263,33 @@ public class LockPickingScreen extends AbstractContainerScreen<LockPickingContai
 	{
 		if(this.pins[pin])
 			return false;
+		// Exactly one attempt may be in flight: a second one could only be resolved against a result the server
+		// has not produced yet.
+		if(this.pendingSequence != 0)
+			return false;
 		this.currPin = pin;
-		LocksNetwork.MAIN.sendToServer(new TryPinPacket((byte) pin));
+		this.pendingSequence = this.nextSequence++;
+		this.pendingTicks = 0;
+		LocksNetwork.MAIN.sendToServer(new TryPinPacket(this.getMenu().containerId, this.pendingSequence, (byte) pin));
 		return true;
 	}
 
-	public void handlePin(boolean correct, boolean reset)
+	public void handlePin(int sequence, int pin, int progress, boolean correct, boolean reset, boolean terminal)
 	{
+		if(terminal && sequence != this.pendingSequence)
+		{
+			// The session was ended server-side (target or dimension no longer checks out); stop accepting input.
+			this.pendingSequence = 0;
+			this.frozen = true;
+			return;
+		}
+		// A result that does not name the outstanding request belongs to an attempt this screen has moved past.
+		if(sequence != this.pendingSequence)
+			return;
+		this.pendingSequence = 0;
+		// The pin and the progress are the server's, not the local animation timer's.
+		if(pin >= 0 && pin < this.pins.length)
+			this.currPin = pin;
 		this.pinTumblers[this.currPin].execute(MoveAction.at(0f, -6f).time(2), MoveAction.at(0f, 6f).time(2));
 		this.upperPins[this.currPin].execute(MoveAction.at(0f, -6f).time(2));
 		if(correct)
@@ -269,13 +299,16 @@ public class LockPickingScreen extends AbstractContainerScreen<LockPickingContai
 		}
 		else
 			this.upperPins[this.currPin].execute(MoveAction.at(0f, 6f).time(2));
-		if(reset)
+		// progress == 0 IS the reset, authoritatively; the flag only picks which failure animation plays.
+		if(progress == 0 && reset)
 		{
 			if(this.mode == LockPickingMode.ITEMLESS)
 				this.resetIntact();
 			else
 				this.reset();
 		}
+		if(terminal)
+			this.frozen = true;
 	}
 
 	// Shared by both failure animations so they cannot drift apart.

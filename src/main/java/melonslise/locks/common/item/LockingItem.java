@@ -13,6 +13,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.ChatFormatting;
 import net.minecraft.world.level.Level;
@@ -37,15 +38,18 @@ public class LockingItem extends Item
 	public static int getOrSetId(ItemStack stack)
 	{
 		CompoundTag nbt = stack.getOrCreateTag();
-		if(!nbt.contains(KEY_ID))
+		if(!nbt.contains(KEY_ID, Tag.TAG_INT))
 			nbt.putInt(KEY_ID, ThreadLocalRandom.current().nextInt());
 		return nbt.getInt(KEY_ID);
 	}
 
+	// Type-checked, not merely key-present: an Id written as a string, a list or a compound by another mod or a
+	// hand-edited save must be refused outright. CompoundTag#getInt would quietly return 0 for those, collapsing
+	// every mistyped stack onto the single credential 0 — one key that opens every such lock.
 	public static boolean hasId(ItemStack stack)
 	{
 		CompoundTag nbt = stack.getTag();
-		return nbt != null && nbt.contains(KEY_ID);
+		return nbt != null && nbt.contains(KEY_ID, Tag.TAG_INT);
 	}
 
 	// Read-only counterpart to getOrSetId, which writes a random id into whatever stack it is handed —
@@ -78,7 +82,7 @@ public class LockingItem extends Item
 	@Override
 	public void appendHoverText(ItemStack stack, @Nullable Level world, List<Component> lines, TooltipFlag flag)
 	{
-		if(!LocksServerConfig.HIDE_LOCK_ID.get() && stack.hasTag() && stack.getTag().contains(KEY_ID))
+		if(!LocksServerConfig.HIDE_LOCK_ID.get() && hasId(stack))
 			lines.add(Component.translatable(Locks.ID + ".tooltip.id", ItemStack.ATTRIBUTE_MODIFIER_FORMAT.format(getOrSetId(stack))).withStyle(ChatFormatting.DARK_GREEN));
 	}
 }

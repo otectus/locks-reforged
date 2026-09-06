@@ -35,6 +35,8 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
 import net.minecraft.network.chat.Component;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
@@ -67,9 +69,20 @@ public class LockPickingContainer extends AbstractContainerMenu
 
 	public final Vec3 pos;
 
+	// The session's identity: the dimension it was opened in and the id of the record it was opened against.
+	// Both are re-checked before every mutation, so a session can never act on another dimension's copy of a
+	// lockable or on a record that has been removed and replaced under the same id.
+	public final ResourceKey<Level> dimension;
+	public final int targetId;
+
 	public final int shocking, sturdy, complexity;
 
 	protected int currIndex = 0;
+
+	// The highest client sequence acted on, plus the verdict it produced. A duplicate or reordered request
+	// replays that verdict instead of mutating anything a second time (no extra pin, no extra pick wear).
+	protected int lastSequence = 0;
+	protected TryPinResultPacket lastResult;
 
 	public LockPickingContainer(int id, Player player, InteractionHand hand, LockPickingMode mode, Lockable lkb)
 	{
@@ -78,6 +91,9 @@ public class LockPickingContainer extends AbstractContainerMenu
 		this.hand = hand;
 		this.mode = mode;
 		this.lockable = lkb;
+
+		this.dimension = player.level().dimension();
+		this.targetId = lkb.id;
 
 		Lockable.State state = lkb.getLockState(player.level());
 		this.pos = state == null ? lkb.bb.center() : state.pos;
@@ -114,7 +130,44 @@ public class LockPickingContainer extends AbstractContainerMenu
 			player.distanceToSqr(this.pos),
 			this.mode == LockPickingMode.ITEM_BACKED && this.isValidPick(player.getItemInHand(this.hand)),
 			player.getItemInHand(this.hand).isEmpty(),
-			LocksServerConfig.ALLOW_ITEMLESS_LOCK_PICKING.get());
+			LocksServerConfig.ALLOW_ITEMLESS_LOCK_PICKING.get(),
+			player.level().dimension().equals(this.dimension),
+			this.isTargetCanonical(player.level()));
+	}
+
+	// The live record under this session's id, or null if it is gone or is no longer the instance the menu was
+	// opened against. Client-side there is no authority to re-resolve against, so the client's own copy stands.
+	protected Lockable resolveTarget(Level level)
+	{
+		if(level.isClientSide)
+			return this.lockable;
+		ILockableHandler handler = level.getCapability(LocksCapabilities.LOCKABLE_HANDLER).orElse(null);
+		if(handler == null)
+			return null;
+		Lockable current = handler.getLoaded().get(this.targetId);
+		if(current == handler.getLoaded().defaultReturnValue() || current != this.lockable)
+			return null;
+		return current;
+	}
+
+	protected boolean isTargetCanonical(Level level)
+	{
+		return this.resolveTarget(level) != null;
+	}
+
+	// Ends a session whose target or dimension no longer checks out, telling the client why before it goes.
+	protected void terminate()
+	{
+		this.sendResult(this.lastSequence, -1, this.currIndex, false, false, true);
+		if(this.player instanceof ServerPlayer sp)
+			sp.closeContainer();
+	}
+
+	protected void sendResult(int sequence, int pin, int progress, boolean correct, boolean reset, boolean terminal)
+	{
+		TryPinResultPacket pkt = new TryPinResultPacket(this.containerId, sequence, pin, progress, correct, reset, terminal);
+		this.lastResult = pkt;
+		LocksNetwork.MAIN.send(PacketDistributor.PLAYER.with(() -> (ServerPlayer) this.player), pkt);
 	}
 
 	@Override
@@ -134,8 +187,33 @@ public class LockPickingContainer extends AbstractContainerMenu
 	}
 
 	// SERVER ONLY
-	public void tryPin(int currPin)
+	public void tryPin(int currPin, int containerId, int sequence)
 	{
+		// A result may only ever be applied to the request that produced it, so the request must name this menu...
+		if(containerId != this.containerId)
+			return;
+		// ...and must advance. A duplicate replays the previous verdict verbatim: no second pin, no second wear.
+		if(sequence <= this.lastSequence)
+		{
+			if(this.lastResult != null && sequence == this.lastSequence)
+				LocksNetwork.MAIN.send(PacketDistributor.PLAYER.with(() -> (ServerPlayer) this.player), this.lastResult);
+			return;
+		}
+		Level level = this.player.level();
+		if(!level.dimension().equals(this.dimension))
+		{
+			this.terminate();
+			return;
+		}
+		// Re-resolve the record from the level's handler before touching it: the lockable this menu holds may
+		// have been removed (block broken, chunk unloaded, carried away) since the session opened.
+		Lockable target = this.resolveTarget(level);
+		if(target == null)
+		{
+			this.terminate();
+			return;
+		}
+		this.lastSequence = sequence;
 		if(this.isOpen())
 			return;
 		boolean correct = this.lockable.lock.checkPin(this.currIndex, currPin);
@@ -148,6 +226,11 @@ public class LockPickingContainer extends AbstractContainerMenu
 			++this.currIndex;
 		if(LockPickingPolicy.resetsProgress(outcome))
 			this.reset();
+		// The unlock is committed here, on the pin that finishes the combination, against the record just
+		// re-resolved above — not in removed(), where the target may no longer exist or may no longer be ours.
+		boolean opened = this.isOpen();
+		if(opened && target.lock.isLocked())
+			this.commitUnlock(target);
 
 		if(correct)
 			this.player.level().playSound(null, this.pos.x, this.pos.y, this.pos.z, LocksSoundEvents.PIN_MATCH.get(), SoundSource.BLOCKS, 1f, 1f);
@@ -170,20 +253,28 @@ public class LockPickingContainer extends AbstractContainerMenu
 				this.player.level().playSound(null, this.pos.x, this.pos.y, this.pos.z, LocksSoundEvents.PIN_FAIL.get(), SoundSource.BLOCKS, failVolume, 1f);
 			}
 		}
-		// The client picks its animation from the menu mode, so the packet stays two plain booleans.
-		LocksNetwork.MAIN.send(PacketDistributor.PLAYER.with(() -> (ServerPlayer) this.player), new TryPinResultPacket(correct, LockPickingPolicy.resetsProgress(outcome)));
+		// The client picks its animation from the menu mode; the packet carries the session identity and the
+		// server's own progress so the client never has to infer either.
+		this.sendResult(sequence, currPin, this.currIndex, correct, LockPickingPolicy.resetsProgress(outcome), opened);
+	}
+
+	// The actual opening: sound, lock state and loot resolution, all against the re-resolved record.
+	protected void commitUnlock(Lockable target)
+	{
+		LocksUtil.setLocked(this.player.level(), target, false, this.player);
+		// null, not player: this runs on the server, where passing the player would EXCLUDE them from the sound.
+		this.player.level().playSound(null, this.pos.x, this.pos.y, this.pos.z, LocksSoundEvents.LOCK_OPEN.get(), SoundSource.BLOCKS, 1f, 1f);
+		LocksUtil.resolveLootTables(this.player.level(), target, this.player);
 	}
 
 	@OnlyIn(Dist.CLIENT)
-	public void handlePin(boolean correct, boolean reset)
+	public void handlePin(int sequence, int pin, int progress, boolean correct, boolean reset, boolean terminal)
 	{
+		// The server's progress is authoritative; the client no longer counts pins for itself.
+		this.currIndex = progress;
 		Screen screen = Minecraft.getInstance().screen;
 		if(screen instanceof LockPickingScreen)
-			((LockPickingScreen) screen).handlePin(correct, reset);
-		if(correct)
-			++this.currIndex;
-		if(reset)
-			this.reset();
+			((LockPickingScreen) screen).handlePin(sequence, pin, progress, correct, reset, terminal);
 	}
 
 	// Spends pick durability for one wrong pin and reports whether that finished the pick. Replaces the
@@ -254,18 +345,10 @@ public class LockPickingContainer extends AbstractContainerMenu
 	public void removed(Player player)
 	{
 		super.removed(player);
-		// Server-only: completion is judged against the server currIndex, so a client cannot forge it.
-		if(player.level().isClientSide)
-			return;
-		if(!this.isOpen() || !this.lockable.lock.isLocked())
-			return;
-		// Explicit target, never a toggle — a finished pick must never re-lock because state moved underneath it.
-		// Deliberately not re-checking canAttempt here: the pins are already solved, and an item landing in the
-		// hand on the closing tick should not swallow the result.
-		LocksUtil.setLocked(player.level(), this.lockable, false, player);
-		// null, not player: this now runs on the server, where passing the player would EXCLUDE them from the sound.
-		this.player.level().playSound(null, this.pos.x, this.pos.y, this.pos.z, LocksSoundEvents.LOCK_OPEN.get(), SoundSource.BLOCKS, 1f, 1f);
-		LocksUtil.resolveLootTables(this.player.level(), this.lockable, this.player);
+		// Nothing but session bookkeeping happens here now. The unlock is committed in tryPin, on the pin that
+		// finishes the combination and against the record re-resolved there, so closing the screen can neither
+		// open a lock the session no longer owns nor be raced by the record disappearing first.
+		this.lastResult = null;
 	}
 
 	public static final IContainerFactory<LockPickingContainer> FACTORY = (id, inv, buf) ->

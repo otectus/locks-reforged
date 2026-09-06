@@ -27,6 +27,11 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 // exclude the compat mixin sources + config and drop the extra mixin wiring. The mod still builds fine.
 ext.carryOnJar = file('libs/carryon-forge-1.20.1-2.1.2.7.jar')
 ext.hasCarryOn = carryOnJar.exists()
+// Opt-in release guard: -PrequireCarryOn=true (or the property in a release script) turns a missing Carry On jar
+// from a silent feature drop into a build failure. Off by default, so dev builds keep today's behavior.
+ext.requireCarryOn = project.hasProperty('requireCarryOn') && Boolean.parseBoolean(project.property('requireCarryOn').toString())
+if (!hasCarryOn && requireCarryOn)
+    throw new GradleException("requireCarryOn is set but ${carryOnJar} is missing — this build would ship without Carry On compatibility.")
 if (!hasCarryOn)
     logger.lifecycle("Carry On jar not found at ${carryOnJar} — building without Carry On compatibility.")
 

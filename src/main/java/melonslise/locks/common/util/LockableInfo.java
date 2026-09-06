@@ -11,12 +11,15 @@ public class LockableInfo
 	public final ItemStack stack;
 	public final int id;
 
+	// The lock and the stack are copied, never aliased: a template captured from the world would otherwise share
+	// its Lock object (and its combo array) with the live lockable it was read from, so every placement of that
+	// template and the original would all be the same mutable lock.
 	public LockableInfo(Cuboid6i bb, Lock lock, Transform tr, ItemStack stack, int id)
 	{
 		this.bb = bb;
-		this.lock = lock;
+		this.lock = lock.copy();
 		this.tr = tr;
-		this.stack = stack;
+		this.stack = stack.copy();
 		this.id = id;
 	}
 

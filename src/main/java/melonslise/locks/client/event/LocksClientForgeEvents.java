@@ -23,6 +23,7 @@ import melonslise.locks.common.init.LocksCapabilities;
 import melonslise.locks.common.init.LocksItemTags;
 import melonslise.locks.common.init.LocksTagHelper;
 import melonslise.locks.common.util.Lockable;
+import melonslise.locks.common.util.SwingProgress;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.LevelRenderer;
@@ -106,7 +107,14 @@ public final class LocksClientForgeEvents
 		if(holdingPick(mc.player) && !LocksServerConfig.HIDE_HUD_TOOLTIP.get())
 		{
 			PoseStack mtx = e.getGuiGraphics().pose();
-			Vector3f vec = LocksClientUtil.worldToScreen(tooltipLockable.getLockState(mc.level).pos, e.getPartialTick());
+			// The lockable can lose its block between the render pass that selected it and this overlay pass.
+			Lockable.State tooltipState = tooltipLockable.getLockState(mc.level);
+			if(tooltipState == null)
+			{
+				tooltipLockable = null;
+				return;
+			}
+			Vector3f vec = LocksClientUtil.worldToScreen(tooltipState.pos, e.getPartialTick());
 			if (vec.z < 0f)
 			{
 				mtx.pushPose();
@@ -183,7 +191,12 @@ public final class LocksClientForgeEvents
 			if(state.tr.face != AttachFace.WALL)
 				mtx.mulPose(LOCK_ROT_X.rotationX((float) Math.toRadians(90f)));
 			mtx.translate(0d, 0.1d, 0d);
-			mtx.mulPose(LOCK_ROT_Z.rotationZ((float) Math.toRadians(Mth.sin(LocksClientUtil.cubicBezier1d(1f, 1f, LocksClientUtil.lerp(lkb.maxSwingTicks - lkb.oldSwingTicks, lkb.maxSwingTicks - lkb.swingTicks, pt) / lkb.maxSwingTicks) * lkb.maxSwingTicks / 5f * 3.14f) * 10f)));
+			// A lock that has never swung has all three counters at 0, so the old raw division was 0/0 -> NaN ->
+			// a non-finite rotation. SwingProgress reports an explicit 0 for that case and the lock hangs still.
+			float swing = SwingProgress.normalized(lkb.oldSwingTicks, lkb.swingTicks, lkb.maxSwingTicks, pt);
+			float swingAngle = lkb.maxSwingTicks <= 0 ? 0f
+				: Mth.sin(LocksClientUtil.cubicBezier1d(1f, 1f, swing) * lkb.maxSwingTicks / 5f * 3.14f) * 10f;
+			mtx.mulPose(LOCK_ROT_Z.rotationZ((float) Math.toRadians(swingAngle)));
 			mtx.translate(0d, -0.1d, 0d);
 			mtx.scale(0.5f, 0.5f, 0.5f);
 			int light = LevelRenderer.getLightColor(mc.level, mut.set(state.pos.x, state.pos.y, state.pos.z));
